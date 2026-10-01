@@ -10,8 +10,8 @@
  * ============================================================
  */
 
-const CACHE_NAME = 'arisan-kita-v17';
-const CACHE_VERSION = 17;
+const CACHE_NAME = 'Munira-Arisan-v18';
+const CACHE_VERSION = 18;
 const SHELL_ASSETS = [
   './',
   './index.html',
