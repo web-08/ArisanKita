@@ -1,0 +1,3313 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#111827" />
+<title id="pageTitle">Dashboard - ArisanKita</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" id="appleTitle" content="ArisanKita" />
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+import {
+  db, auth, COLLECTIONS,
+  doc, getDoc, getDocs, collection,
+  onSnapshot,
+  formatIDR, escapeHtml, timestampToString, timestampToDateTime,
+  generateId, nowTimestamp, normalizePhone, fillTemplate, openWhatsApp
+} from './firebase-config.js';
+
+// Import onSnapshot dari SDK langsung (untuk transactions listener)
+import { onSnapshot as fbOnSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { checkAuth, logoutAdmin } from './firebase-auth.js';
+import { addNotification, subscribeNotifications } from './firebase-notifications.js';
+
+window.FB = {
+  db, auth, COLLECTIONS,
+  doc, getDoc, getDocs, collection,
+  onSnapshot: fbOnSnapshot,
+  formatIDR, escapeHtml, timestampToString, timestampToDateTime,
+  generateId, nowTimestamp, normalizePhone, fillTemplate, openWhatsApp
+};
+window.FBAuth = { checkAuth, logoutAdmin };
+window.FBNotif = { addNotification, subscribeNotifications };
+
+console.log('✅ Firebase ready for dashboard');
+</script>
+
+<style>
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: #1f2937; }
+  ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+  .fade-in { animation: fadeIn .25s ease; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px);} to { opacity:1; transform: translateY(0);} }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media print {
+    aside, header, footer, #toastContainer, #modal, #idleWarning, .no-print { display: none !important; }
+    body { background: white !important; color: black !important; }
+    .lg\:pl-64 { padding-left: 0 !important; }
+    #mainContent { padding: 0 !important; }
+  }
+</style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+
+<!-- SIDEBAR -->
+<aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-64 bg-gray-800 border-r border-gray-700 transform -translate-x-full lg:translate-x-0 transition-transform duration-200 flex flex-col">
+  <div class="flex items-center gap-2 px-5 py-4 border-b border-gray-700">
+    <img id="sidebarIcon" src="icon-192.png" alt="Logo" class="w-10 h-10 rounded-xl shadow-md object-cover ring-2 ring-gray-700" />
+    <div>
+      <div id="sidebarAppName" class="font-bold text-gray-100 leading-tight">ArisanKita</div>
+      <div class="text-xs text-gray-400">Admin Panel</div>
+    </div>
+  </div>
+  <nav class="flex-1 overflow-y-auto py-3">
+    <ul id="navMenu" class="space-y-1 px-3 text-sm">
+      <li><button data-view="dashboard" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-chart-line w-5 text-center"></i> Dashboard</button></li>
+      <li><button data-view="members" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-users w-5 text-center"></i> Anggota</button></li>
+      <li><button data-view="groups" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-calendar-days w-5 text-center"></i> Kelompok Arisan</button></li>
+      <li><button data-view="payments" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-credit-card w-5 text-center"></i> Pembayaran</button></li>
+      <li><button data-view="reminders" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-brands fa-whatsapp w-5 text-center"></i> Reminder WA</button></li>
+      <li><button data-view="draw" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-dice w-5 text-center"></i> Pengundian</button></li>
+      <li><button data-view="winners" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-trophy w-5 text-center"></i> Pemenang</button></li>
+      <li><button data-view="finance" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-wallet w-5 text-center"></i> Keuangan</button></li>
+      <li><button data-view="reports" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-print w-5 text-center"></i> Cetak Laporan</button></li>
+      <li><button data-view="notifications" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-bell w-5 text-center"></i> Notifikasi <span id="notifBadge" class="ml-auto hidden text-xs bg-red-500 text-white px-2 py-0.5 rounded-full">0</span></button></li>
+      <li><button data-view="logs" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-clipboard-list w-5 text-center"></i> Log Aktivitas</button></li>
+      <li><button data-view="settings" class="nav-item w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 hover:bg-gray-700 text-gray-300 transition"><i class="fa-solid fa-gear w-5 text-center"></i> Pengaturan</button></li>
+    </ul>
+  </nav>
+  <div class="p-3 border-t border-gray-700">
+    <button id="logoutBtn" class="w-full text-left px-3 py-2.5 rounded-lg flex items-center gap-3 text-red-400 hover:bg-red-900/30 text-sm font-medium transition">
+      <i class="fa-solid fa-right-from-bracket w-5 text-center"></i> Logout
+    </button>
+  </div>
+</aside>
+<div id="sidebarOverlay" class="fixed inset-0 bg-black/60 z-30 hidden lg:hidden"></div>
+
+<div class="lg:pl-64 min-h-screen flex flex-col">
+  <header class="sticky top-0 z-20 bg-gray-800 border-b border-gray-700">
+    <div class="px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <button id="menuToggle" class="lg:hidden p-2 rounded-lg hover:bg-gray-700">
+          <i class="fa-solid fa-bars text-gray-300 text-xl"></i>
+        </button>
+        <h1 id="pageTitleHeader" class="text-lg sm:text-xl font-bold text-gray-100">Dashboard</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:block text-right">
+          <div class="text-xs text-gray-400">Login sebagai</div>
+          <div id="userLabel" class="text-sm font-semibold text-gray-100">admin</div>
+        </div>
+        <img src="icon-192.png" alt="Logo" class="w-9 h-9 rounded-full shadow-md object-cover ring-2 ring-gray-700" />
+      </div>
+    </div>
+  </header>
+
+  <main id="mainContent" class="flex-1 p-4 sm:p-6"></main>
+
+  <footer class="border-t border-gray-700 bg-gray-800">
+    <div class="px-4 sm:px-6 py-4 text-xs text-gray-500 text-center">
+      &copy; <span id="year"></span> <span id="footerAppName" class="text-gray-400">ArisanKita</span>
+    </div>
+  </footer>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/70" data-close-modal></div>
+  <div class="relative w-full h-full flex items-center justify-center p-4 pointer-events-none">
+    <div id="modalBox" class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto pointer-events-auto fade-in border border-gray-700">
+      <div class="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+        <h3 id="modalTitle" class="font-bold text-gray-100">Modal</h3>
+        <button data-close-modal class="p-1.5 rounded-lg hover:bg-gray-700">
+          <i class="fa-solid fa-xmark text-gray-400"></i>
+        </button>
+      </div>
+      <div id="modalBody" class="p-5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- IDLE WARNING MODAL -->
+<div id="idleWarning" class="fixed inset-0 z-[70] hidden">
+  <div class="absolute inset-0 bg-black/80 backdrop-blur-sm"></div>
+  <div class="relative w-full h-full flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center fade-in border border-gray-700">
+      <div class="text-5xl mb-3 text-amber-400"><i class="fa-solid fa-clock"></i></div>
+      <h3 class="text-lg font-bold text-gray-100 mb-2">Sesi akan berakhir</h3>
+      <p class="text-sm text-gray-400 mb-4">Anda tidak aktif selama 10 menit. Sesi akan berakhir dalam:</p>
+      <div id="idleCountdown" class="text-4xl font-extrabold text-red-400 mb-5">30</div>
+      <div class="flex gap-2">
+        <button id="idleExtendBtn" class="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition">
+          <i class="fa-solid fa-rotate-right"></i> Perpanjang
+        </button>
+        <button id="idleLogoutBtn" class="flex-1 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold transition">
+          <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toastContainer" class="fixed bottom-4 right-4 z-[80] space-y-2 w-[calc(100%-2rem)] sm:w-auto sm:max-w-sm"></div>
+
+<script>
+
+/* ============================================================
+   GLOBAL ALIAS (lazy - akses window.FB saat dipanggil)
+   ============================================================ */
+function escapeHtml(s) {
+  try { return window.FB.escapeHtml(s); }
+  catch (e) { return String(s == null ? '' : s); }
+}
+function formatIDR(n) {
+  try { return window.FB.formatIDR(n); }
+  catch (e) { return 'Rp ' + Number(n || 0).toLocaleString('id-ID'); }
+}
+function normalizePhone(p) {
+  try { return window.FB.normalizePhone(p); }
+  catch (e) { return String(p || ''); }
+}
+function fillTemplate(t, v) {
+  try { return window.FB.fillTemplate(t, v); }
+  catch (e) { return String(t || ''); }
+}
+function openWhatsApp(p, m) {
+  try { return window.FB.openWhatsApp(p, m); }
+  catch (e) { alert('Gagal membuka WhatsApp'); return false; }
+}
+function timestampToString(ts) {
+  try { return window.FB.timestampToString(ts); }
+  catch (e) { return '-'; }
+}
+function timestampToDateTime(ts) {
+  try { return window.FB.timestampToDateTime(ts); }
+  catch (e) { return '-'; }
+}
+function generateId(prefix) {
+  try { return window.FB.generateId(prefix); }
+  catch (e) { return prefix + '_' + Date.now() + '_' + Math.floor(Math.random() * 10000); }
+}
+function nowTimestamp() {
+  try { return window.FB.nowTimestamp(); }
+  catch (e) { return new Date(); }
+}
+
+/* ============================================================
+   GLOBAL ERROR HANDLER
+   ============================================================ */
+window.addEventListener('error', (e) => {
+  console.error('❌ Global error:', e.message, e.error);
+  // Hanya tampil toast kalau bukan error module loading
+  if (e.message && !e.message.includes('Module') && !e.message.includes('import')) {
+    try { toast('Terjadi kesalahan. Silakan coba lagi.', 'error'); } catch (err) {}
+  }
+});
+
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('❌ Unhandled promise rejection:', e.reason);
+  const msg = e.reason?.message || String(e.reason || '');
+  if (msg.includes('permission') || msg.includes('permissions')) {
+    try { toast('Akses ditolak. Cek aturan Firestore.', 'error'); } catch (err) {}
+  } else if (msg.includes('network') || msg.includes('offline')) {
+    try { toast('Koneksi bermasalah. Cek internet.', 'error'); } catch (err) {}
+  } else {
+    try { toast('Terjadi kesalahan.', 'error'); } catch (err) {}
+  }
+});
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const state = {
+  user: null,
+  appName: 'ArisanKita',
+  currentView: 'dashboard',
+  cache: {
+    dashboard: null,
+    members: [],
+    groups: [],
+    payments: [],
+    winners: [],
+    transactions: [],
+    notifications: [],
+    logs: [],
+    settings: {}
+  },
+  dataLoaded: false,
+  countdownTimer: null,
+  drawState: { groupId: '', period: 1, method: 'random', candidates: [], winner: null, animating: false },
+  membersModule: null,
+  groupsModule: null,
+  groupMembersModule: null,
+  paymentsModule: null,
+  winnersModule: null,
+  notificationsModule: null,
+  transactionsModule: null,
+  logsModule: null,
+  settingsModule: null,
+  payListeners: [],
+  notifListener: null
+};
+
+/* ============================================================
+   LOAD FIREBASE MODULES
+   ============================================================ */
+async function loadFirebaseModules() {
+  try {
+    state.membersModule = await import('./firebase-members.js');
+    state.groupsModule = await import('./firebase-groups.js');
+    state.groupMembersModule = await import('./firebase-group-members.js');
+    state.paymentsModule = await import('./firebase-payments.js');
+    state.winnersModule = await import('./firebase-winners.js');
+    state.notificationsModule = await import('./firebase-notifications.js');
+    state.transactionsModule = await import('./firebase-transactions.js');
+    state.logsModule = await import('./firebase-logs.js');
+    state.settingsModule = await import('./firebase-settings.js');
+    console.log('✅ Firebase modules loaded');
+    return true;
+  } catch (e) {
+    console.error('Module load error:', e);
+    return false;
+  }
+}
+
+/* ============================================================
+   DO LOGOUT
+   ============================================================ */
+async function doLogout(reason) {
+  try {
+    if (reason) {
+      try { localStorage.setItem('arisan_logout_reason', reason); } catch (e) {}
+    }
+    await window.FBAuth.logoutAdmin();
+  } catch (e) {
+    window.location.href = 'login.html';
+  }
+}
+
+/* ============================================================
+   ENSURE AUTH
+   ============================================================ */
+async function ensureAuth() {
+  // // ⚠️ DEV MODE: Bypass login
+  // console.warn('⚠️ DEV MODE: Auth bypassed. JANGAN dipakai di production!');
+  
+  // state.user = { email: 'dev@local', uid: 'dev-mode' };
+  // const userLabel = document.getElementById('userLabel');
+  // if (userLabel) userLabel.textContent = 'Dev Mode';
+  // return true;
+
+  // ═══════════════════════════════════════════════════════════
+  // KODE ASLI — Aktifkan kembali untuk production
+  // ═══════════════════════════════════════════════════════════
+  try {
+    const result = await window.FBAuth.checkAuth();
+    if (!result.ok) {
+      window.location.href = 'login.html';
+      return false;
+    }
+    state.user = result.user;
+    const userLabel = document.getElementById('userLabel');
+    if (userLabel) userLabel.textContent = result.user.email || 'admin';
+    return true;
+  } catch (e) {
+    console.error('ensureAuth error:', e);
+    window.location.href = 'login.html';
+    return false;
+  }
+}
+
+/* ============================================================
+   LOAD ALL DATA
+   ============================================================ */
+async function loadAllData() {
+  const main = document.getElementById('mainContent');
+  if (main) {
+  main.innerHTML = `
+    <div class="space-y-4 animate-pulse">
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        ${Array(5).fill(0).map(() => '<div class="bg-gray-800 rounded-2xl p-4 h-20"></div>').join('')}
+      </div>
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        ${Array(4).fill(0).map(() => '<div class="bg-gray-800 rounded-2xl p-4 h-20"></div>').join('')}
+      </div>
+      <div class="grid grid-cols-3 gap-3">
+        ${Array(3).fill(0).map(() => '<div class="bg-gray-800 rounded-2xl p-4 h-20"></div>').join('')}
+      </div>
+      <div class="bg-gray-800 rounded-2xl p-5 h-40"></div>
+    </div>`;
+  }
+
+  try {
+    // Load settings
+    try {
+      const settingsRef = window.FB.doc(window.FB.db, 'settings', 'app');
+      const settingsSnap = await window.FB.getDoc(settingsRef);
+      if (settingsSnap.exists()) {
+        state.cache.settings = settingsSnap.data();
+        if (state.cache.settings.app_name) applyAppName(state.cache.settings.app_name);
+      }
+    } catch (e) { console.warn('Settings load error:', e); }
+
+    // Load members
+    const membersRes = await state.membersModule.getMembers({});
+    state.cache.members = membersRes.ok ? membersRes.data : [];
+
+    // Load groups
+    const groupsRes = await state.groupsModule.getGroups();
+    state.cache.groups = groupsRes.ok ? groupsRes.data : [];
+
+    // Load payments
+    const payRes = await state.paymentsModule.getPayments({});
+    state.cache.payments = payRes.ok ? payRes.data : [];
+
+    // Load winners
+    const winRes = await state.winnersModule.getWinnerHistory({});
+    state.cache.winners = winRes.ok ? winRes.data : [];
+
+    // Load notifications
+    const notifRes = await state.notificationsModule.getNotifications({});
+    state.cache.notifications = notifRes.ok ? notifRes.data : [];
+
+    // Load transactions (langsung dari Firestore)
+    try {
+      const trxRef = window.FB.collection(window.FB.db, 'transactions');
+      const trxSnap = await window.FB.getDocs(trxRef);
+      const trxList = [];
+      trxSnap.forEach(d => trxList.push({ id: d.id, ...d.data() }));
+      
+      // Sort by transaction_date desc
+      trxList.sort((a, b) => {
+        const da = new Date(a.transaction_date || 0);
+        const db2 = new Date(b.transaction_date || 0);
+        return db2 - da;
+      });
+      
+      state.cache.transactions = trxList;
+    } catch (e) {
+      console.warn('Load transactions error:', e);
+      state.cache.transactions = [];
+    }
+
+    // Load logs
+    try {
+      const logsRes = await state.logsModule.getLogs(200);
+      state.cache.logs = logsRes.ok ? logsRes.data : [];
+    } catch (e) {
+      console.warn('Load logs error:', e);
+      state.cache.logs = [];
+    }
+
+    // Compute dashboard
+    state.cache.dashboard = computeDashboardStats();
+
+    state.dataLoaded = true;
+
+    // Auto-check backfill (jalankan di background, tidak block UI)
+    setTimeout(async () => {
+      try {
+        const trxRef = window.FB.collection(window.FB.db, 'transactions');
+        const trxSnap = await window.FB.getDocs(trxRef);
+        const existingPaymentIds = new Set();
+        trxSnap.forEach(d => {
+          if (d.data().payment_id) existingPaymentIds.add(d.data().payment_id);
+        });
+
+        const missingCount = state.cache.payments.filter(p =>
+          p.status === 'paid' && !existingPaymentIds.has(p.id)
+        ).length;
+
+        if (missingCount > 0) {
+          console.log(`⚠️ ${missingCount} payments belum punya transaksi, auto-backfill...`);
+          await state.paymentsModule.backfillTransactions();
+          console.log('✅ Auto-backfill selesai');
+        }
+      } catch (e) {
+        console.warn('Auto-backfill check error:', e);
+      }
+    }, 2000); // Delay 2 detik, biar UI sudah tampil
+
+    return true;
+  } catch (e) {
+    console.error('loadAllData error:', e);
+    showErrorState(e.message);
+    return false;
+  }
+}
+
+/* ============================================================
+   COMPUTE DASHBOARD
+   ============================================================ */
+function computeDashboardStats() {
+  const members = state.cache.members || [];
+  const groups = state.cache.groups || [];
+  const payments = state.cache.payments || [];
+  const transactions = state.cache.transactions || [];
+  const winners = state.cache.winners || [];
+  const notifications = state.cache.notifications || [];
+
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);  const paidCount = payments.filter(p => p.status === 'paid').length;
+  const unpaidCount = payments.filter(p => p.status !== 'paid').length;
+  const activeGroups = groups.filter(g => g.status === 'active');
+  const totalGroupMembers = groups.reduce((sum, g) => sum + (g.member_count || 0), 0);
+
+  return {
+    app_name: state.appName,
+    totalMembers: members.length,
+    activeMembers: members.filter(m => m.status === 'active').length,
+    totalGroups: groups.length,
+    activeGroups: activeGroups.length,
+    totalGroupMembers: totalGroupMembers,
+    totalPayments: payments.length,
+    paidCount: paidCount,
+    unpaidCount: unpaidCount,
+    totalIncome: totalIncome,
+    totalExpense: totalExpense,
+    balance: totalIncome - totalExpense,
+    totalWinners: winners.length,
+    unreadNotif: notifications.filter(n => n.status === 'unread').length,
+    nearestDue: null,
+    latestWinner: winners[0] || null,
+    activeGroupsList: activeGroups.map(g => ({
+      ...g,
+      member_count: g.member_count || 0
+    }))
+  };
+}
+
+/* ============================================================
+   SHOW ERROR STATE
+   ============================================================ */
+function showErrorState(message) {
+  const main = document.getElementById('mainContent');
+  main.innerHTML = `
+    <div class="max-w-md mx-auto mt-10 bg-gray-800 rounded-2xl p-6 shadow-sm border border-gray-700 text-center">
+      <div class="text-5xl mb-3 text-red-400"><i class="fa-solid fa-triangle-exclamation"></i></div>
+      <h3 class="font-bold text-gray-100 text-lg mb-2">Gagal Memuat Data</h3>
+      <p class="text-sm text-gray-400 mb-5">${escapeHtml(message || 'Periksa koneksi internet Anda, lalu coba lagi.')}</p>
+      <button id="retryLoadBtn" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">
+        <i class="fa-solid fa-rotate-right"></i> Coba Lagi
+      </button>
+    </div>`;
+  document.getElementById('retryLoadBtn').addEventListener('click', async () => {
+    const ok = await loadAllData();
+    if (ok) switchView(state.currentView || 'dashboard');
+  });
+}
+
+/* ============================================================
+   APPLY APP NAME (kalau belum ada, tidak masalah)
+   ============================================================ */
+const viewTitles = {
+  dashboard: 'Dashboard',
+  members: 'Manajemen Anggota',
+  groups: 'Kelompok Arisan',
+  payments: 'Pembayaran',
+  reminders: 'Reminder WhatsApp',
+  draw: 'Pengundian Pemenang',
+  winners: 'Riwayat Pemenang',
+  finance: 'Keuangan',
+  reports: 'Cetak Laporan',
+  notifications: 'Notifikasi',
+  logs: 'Log Aktivitas',
+  settings: 'Pengaturan'
+};
+
+function applyAppName(name) {
+  if (!name) return;
+  state.appName = name;
+  try {
+    const sidebarName = document.getElementById('sidebarAppName');
+    if (sidebarName) sidebarName.textContent = name;
+
+    const footer = document.getElementById('footerAppName');
+    if (footer) footer.textContent = name;
+
+    const appleTitle = document.getElementById('appleTitle');
+    if (appleTitle) appleTitle.setAttribute('content', name);
+
+    const viewLabel = viewTitles[state.currentView] || state.currentView || 'Dashboard';
+    const pageHeader = document.getElementById('pageTitleHeader');
+    if (pageHeader) pageHeader.textContent = viewLabel;
+
+    document.title = viewLabel + ' - ' + name;
+  } catch (e) { console.error(e); }
+}
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
+function $(id) { return document.getElementById(id); }
+function formatDate(s) {
+  if (!s) return '-';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return String(s);
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function formatDateTime(s) {
+  if (!s) return '-';
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return String(s);
+  return d.toLocaleString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function statusBadge(status) {
+  const map = {
+    paid:     ['Lunas',       'bg-emerald-900/50 text-emerald-300 ring-1 ring-emerald-700/50'],
+    partial:  ['Sebagian',    'bg-blue-900/50 text-blue-300 ring-1 ring-blue-700/50'],
+    unpaid:   ['Belum Bayar', 'bg-gray-700 text-gray-300 ring-1 ring-gray-600'],
+    pending:  ['Menunggu',    'bg-amber-900/50 text-amber-300 ring-1 ring-amber-700/50'],
+    rejected: ['Ditolak',     'bg-red-900/50 text-red-300 ring-1 ring-red-700/50'],
+    active:   ['Aktif',       'bg-emerald-900/50 text-emerald-300 ring-1 ring-emerald-700/50'],
+    inactive: ['Nonaktif',    'bg-gray-700 text-gray-400 ring-1 ring-gray-600'],
+    read:     ['Dibaca',      'bg-gray-700 text-gray-400'],
+    unread:   ['Baru',        'bg-blue-900/50 text-blue-300 ring-1 ring-blue-700/50']
+  };
+  const m = map[status] || [status, 'bg-gray-700 text-gray-300'];
+  return '<span class="inline-block text-xs px-2 py-0.5 rounded-full font-medium ' + m[1] + '">' + escapeHtml(m[0]) + '</span>';
+}
+function toast(message, type) {
+  const colors = { success: 'bg-emerald-600', error: 'bg-red-600', warning: 'bg-amber-600', info: 'bg-blue-600' };
+  const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+  const el = document.createElement('div');
+  el.className = 'fade-in text-white px-4 py-3 rounded-xl shadow-lg flex items-start gap-3 text-sm ' + (colors[type] || colors.info);
+  el.innerHTML = '<i class="fa-solid ' + (icons[type] || icons.info) + ' mt-0.5"></i><div class="flex-1">' + escapeHtml(message) + '</div><button class="opacity-80 hover:opacity-100"><i class="fa-solid fa-xmark"></i></button>';
+  el.querySelector('button').addEventListener('click', () => el.remove());
+  $('toastContainer').appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+function openModal(title, bodyHtml) {
+  $('modalTitle').textContent = title;
+  $('modalBody').innerHTML = bodyHtml;
+  $('modal').classList.remove('hidden');
+}
+function closeModal() {
+  $('modal').classList.add('hidden');
+  $('modalBody').innerHTML = '';
+}
+function applyAppName(name) {
+  if (!name) return;
+  state.appName = name;
+  try {
+    const sidebarName = $('sidebarAppName');
+    if (sidebarName) sidebarName.textContent = name;
+
+    const footer = $('footerAppName');
+    if (footer) footer.textContent = name;
+
+    const appleTitle = $('appleTitle');
+    if (appleTitle) appleTitle.setAttribute('content', name);
+
+    const viewLabel = viewTitles[state.currentView] || state.currentView || 'Dashboard';
+    const pageHeader = $('pageTitleHeader');
+    if (pageHeader) pageHeader.textContent = viewLabel;
+
+    document.title = viewLabel + ' - ' + name;
+  } catch (e) { console.error(e); }
+}
+
+/* ============================================================
+   IDLE TIMEOUT
+   ============================================================ */
+const idle = {
+  timeout: 10 * 60 * 1000,
+  warningDuration: 30 * 1000,
+  lastActivity: Date.now(),
+  warningTimer: null,
+  logoutTimer: null,
+  countdownInterval: null,
+  warningShown: false,
+  paused: false,
+  events: ['mousemove', 'mousedown', 'keydown', 'touchstart', 'touchmove', 'scroll', 'click']
+};
+
+function registerIdleListeners() {
+  idle.events.forEach(evt => {
+    document.addEventListener(evt, onUserActivity, { passive: true });
+  });
+}
+function onUserActivity() {
+  if (idle.warningShown) return;
+  if (idle.paused) return;
+  idle.lastActivity = Date.now();
+  resetIdleTimers();
+}
+function resetIdleTimers() {
+  clearTimeout(idle.warningTimer);
+  clearTimeout(idle.logoutTimer);
+  idle.warningTimer = setTimeout(showIdleWarning, idle.timeout);
+}
+function pauseIdle() {
+  idle.paused = true;
+  clearTimeout(idle.warningTimer);
+  clearTimeout(idle.logoutTimer);
+}
+function resumeIdle() {
+  idle.paused = false;
+  idle.lastActivity = Date.now();
+  resetIdleTimers();
+  hideIdleWarning();
+}
+function showIdleWarning() {
+  if (idle.warningShown) return;
+  idle.warningShown = true;
+  $('idleWarning').classList.remove('hidden');
+  let remaining = Math.floor(idle.warningDuration / 1000);
+  $('idleCountdown').textContent = remaining;
+  idle.countdownInterval = setInterval(() => {
+    remaining--;
+    if (remaining >= 0) $('idleCountdown').textContent = remaining;
+    if (remaining <= 0) clearInterval(idle.countdownInterval);
+  }, 1000);
+  idle.logoutTimer = setTimeout(() => {
+    doLogout('Sesi berakhir karena tidak aktif selama 10 menit.');
+  }, idle.warningDuration);
+}
+function hideIdleWarning() {
+  idle.warningShown = false;
+  $('idleWarning').classList.add('hidden');
+  if (idle.countdownInterval) clearInterval(idle.countdownInterval);
+  clearTimeout(idle.logoutTimer);
+}
+function setupIdleUI() {
+  $('idleExtendBtn').addEventListener('click', () => {
+    hideIdleWarning();
+    idle.lastActivity = Date.now();
+    resetIdleTimers();
+    toast('Sesi diperpanjang.', 'success');
+  });
+  $('idleLogoutBtn').addEventListener('click', () => {
+    hideIdleWarning();
+    doLogout('Anda logout manual.');
+  });
+}
+
+/* ============================================================
+   NAVIGATION
+   ============================================================ */
+function setActiveNav(view) {
+  document.querySelectorAll('.nav-item').forEach(b => {
+    if (b.dataset.view === view) {
+      b.classList.add('bg-blue-900/40', 'text-blue-300', 'font-semibold');
+      b.classList.remove('text-gray-300');
+    } else {
+      b.classList.remove('bg-blue-900/40', 'text-blue-300', 'font-semibold');
+      b.classList.add('text-gray-300');
+    }
+  });
+}
+
+async function switchView(view) {
+  state.currentView = view;
+  setActiveNav(view);
+  $('pageTitleHeader').textContent = viewTitles[view] || view;
+  document.title = (viewTitles[view] || view) + ' - ' + state.appName;
+  if (state.countdownTimer) { clearInterval(state.countdownTimer); state.countdownTimer = null; }
+  if (!state.dataLoaded) {
+    const ok = await loadAllData();
+    if (!ok) return;
+  }
+  const main = $('mainContent');
+  try {
+    if (view === 'dashboard') await renderDashboard();
+    else if (view === 'members') await renderMembers();
+    else if (view === 'groups') await renderGroups();
+    else if (view === 'payments') await renderPayments();
+    else if (view === 'reminders') await renderReminders();
+    else if (view === 'draw') await renderDraw();
+    else if (view === 'winners') await renderWinners();
+    else if (view === 'finance') await renderFinance();
+    else if (view === 'reports') await renderReports();
+    else if (view === 'notifications') await renderNotifications();
+    else if (view === 'logs') await renderLogs();
+    else if (view === 'settings') await renderSettings();
+  } catch (e) {
+    main.innerHTML = '<div class="bg-red-900/40 border border-red-700/50 text-red-200 px-4 py-3 rounded-lg"><strong>Error:</strong> ' + escapeHtml(e.message || 'Terjadi kesalahan.') + '</div>';
+    console.error(e);
+  }
+}
+
+/* ============================================================
+   DASHBOARD
+   ============================================================ */
+function statCard(label, value, icon, color) {
+  const colors = {
+    blue: 'from-blue-500 to-blue-600', emerald: 'from-emerald-500 to-emerald-600',
+    amber: 'from-amber-500 to-amber-600', red: 'from-red-500 to-red-600',
+    purple: 'from-purple-500 to-purple-600'
+  };
+  return `<article class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br ${colors[color]} text-white flex items-center justify-center text-lg flex-shrink-0"><i class="fa-solid ${icon}"></i></div>
+      <div class="min-w-0">
+        <div class="text-xs text-gray-400">${escapeHtml(label)}</div>
+        <div class="text-lg sm:text-xl font-bold text-gray-100 truncate">${escapeHtml(String(value))}</div>
+      </div>
+    </div>
+  </article>`;
+}
+
+function updateNotifBadge(count) {
+  const b = $('notifBadge');
+  if (!b) return;
+  if (count > 0) { b.textContent = count; b.classList.remove('hidden'); }
+  else b.classList.add('hidden');
+}
+
+async function renderDashboard() {
+  let d = state.cache.dashboard;
+  if (!d) {
+    const res = await apiCall('getDashboardData', { token: state.token });
+    if (!res.ok) throw new Error(res.message);
+    d = res.data;
+    state.cache.dashboard = d;
+  }
+  if (d.app_name) applyAppName(d.app_name);
+  updateNotifBadge(d.unreadNotif);
+
+  let nearestHtml = '<p class="text-sm text-gray-400">Tidak ada jatuh tempo mendatang.</p>';
+  if (d.nearestDue) {
+    nearestHtml = `
+      <div class="flex items-center gap-3">
+        <div class="flex-1">
+          <div class="text-sm text-gray-400">Jatuh Tempo Terdekat</div>
+          <div class="font-semibold text-gray-100">${escapeHtml(d.nearestDue.member_name || '-')} — Putaran ${escapeHtml(d.nearestDue.period_number)}</div>
+          <div class="text-xs text-gray-500 mt-1">${formatDate(d.nearestDue.due_date)} • ${formatIDR(d.nearestDue.amount)}</div>
+        </div>
+      </div>
+      <div id="countdownBox" class="mt-3 grid grid-cols-4 gap-2 text-center"></div>`;
+  }
+  let winnerHtml = '<p class="text-sm text-gray-400">Belum ada pemenang.</p>';
+  if (d.latestWinner) {
+    winnerHtml = `<div class="text-center">
+      <div class="text-3xl font-extrabold text-blue-400">No. ${escapeHtml(d.latestWinner.member_number)}</div>
+      <div class="text-lg font-bold text-gray-100 mt-1">${escapeHtml(d.latestWinner.member_name)}</div>
+      <div class="text-xs text-gray-400 mt-1">Putaran ${escapeHtml(d.latestWinner.period_number)} • ${escapeHtml(d.latestWinner.draw_method)}</div>
+      <div class="text-xs text-gray-500 mt-1">${formatDateTime(d.latestWinner.drawn_at)}</div>
+    </div>`;
+  }
+
+  $('mainContent').innerHTML = `
+    <section class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+      ${statCard('Total Anggota', d.totalMembers, 'fa-users', 'blue')}
+      ${statCard('Aktif', d.activeMembers, 'fa-user-check', 'emerald')}
+      ${statCard('Total Kelompok', d.totalGroups, 'fa-calendar-days', 'purple')}
+      ${statCard('Kelompok Aktif', d.activeGroups, 'fa-fire', 'amber')}
+      ${statCard('Keanggotaan', d.totalGroupMembers || 0, 'fa-link', 'blue')}
+    </section>
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4">
+      ${statCard('Total Pembayaran', d.totalPayments, 'fa-credit-card', 'blue')}
+      ${statCard('Lunas', d.paidCount, 'fa-circle-check', 'emerald')}
+      ${statCard('Belum Lunas', d.unpaidCount, 'fa-hourglass-half', 'amber')}
+      ${statCard('Pemenang', d.totalWinners, 'fa-trophy', 'purple')}
+    </section>
+    <section class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+      ${statCard('Total Pemasukan', formatIDR(d.totalIncome), 'fa-arrow-down', 'emerald')}
+      ${statCard('Total Pengeluaran', formatIDR(d.totalExpense), 'fa-arrow-up', 'red')}
+      ${statCard('Saldo', formatIDR(d.balance), 'fa-wallet', 'blue')}
+    </section>
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+      <article class="bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-700">
+        <h3 class="font-bold text-gray-100 mb-3 flex items-center gap-2"><i class="fa-solid fa-clock text-amber-400"></i> Jatuh Tempo</h3>${nearestHtml}
+      </article>
+      <article class="bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-700">
+        <h3 class="font-bold text-gray-100 mb-3 flex items-center gap-2"><i class="fa-solid fa-trophy text-amber-400"></i> Pemenang Terbaru</h3>${winnerHtml}
+      </article>
+    </section>
+    <section class="bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-700 mt-4">
+      <h3 class="font-bold text-gray-100 mb-3 flex items-center gap-2"><i class="fa-solid fa-calendar-days text-blue-400"></i> Kelompok Aktif</h3>
+      ${d.activeGroupsList && d.activeGroupsList.length ?
+        '<ul class="divide-y divide-gray-700">' + d.activeGroupsList.map(g => `
+          <li class="py-3 flex items-center justify-between gap-3">
+            <div><div class="font-medium text-gray-100">${escapeHtml(g.name)}</div>
+            <div class="text-xs text-gray-400">${g.period_days} hari • ${formatIDR(g.amount)} • ${g.member_count || 0} anggota</div></div>
+            ${statusBadge(g.status)}
+          </li>`).join('') + '</ul>'
+        : '<p class="text-sm text-gray-400">Belum ada kelompok aktif.</p>'}
+    </section>
+  `;
+  if (d.nearestDue) startCountdown(d.nearestDue.due_date);
+}
+
+function startCountdown(dueDate) {
+  if (state.countdownTimer) clearInterval(state.countdownTimer);
+  const box = $('countdownBox');
+  if (!box) return;
+  const target = new Date(dueDate).getTime();
+  function tick() {
+    const diff = target - Date.now();
+    if (diff <= 0) {
+      box.innerHTML = '<div class="col-span-4 text-red-400 font-bold text-lg">TERLAMBAT</div>';
+      return;
+    }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    box.innerHTML = [['Hari', d], ['Jam', h], ['Menit', m], ['Detik', s]].map(([l, v]) => `
+      <div class="bg-blue-900/40 rounded-lg py-2 ring-1 ring-blue-700/50">
+        <div class="text-lg font-bold text-blue-300">${v}</div>
+        <div class="text-[10px] text-blue-400 uppercase">${l}</div>
+      </div>`).join('');
+  }
+  tick();
+  state.countdownTimer = setInterval(tick, 1000);
+}
+
+/* ============================================================
+   MEMBERS
+   ============================================================ */
+async function renderMembers() {
+  try {
+    const [res, grpRes] = await Promise.all([
+      state.membersModule.getMembers({}),
+      state.groupsModule.getGroups()
+    ]);
+    if (res.ok) state.cache.members = res.data;
+    if (grpRes.ok) state.cache.groups = grpRes.data;
+  } catch (e) {
+    console.error('Refresh members error:', e);
+  }
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-4">
+        <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <input id="memberSearch" type="text" placeholder="Cari nama / nomor / HP..." class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none w-full sm:w-64">
+          <select id="memberFilter" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+            <option value="all">Semua Status</option>
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
+          <select id="memberGroupFilter" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+            <option value="all">Semua Kelompok</option>
+            ${state.cache.groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
+          </select>
+        </div>
+        <button id="addMemberBtn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-sm transition"><i class="fa-solid fa-plus"></i> Tambah Anggota</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-400 border-b border-gray-700">
+            <th class="py-2 pr-2">No</th>
+            <th class="py-2 pr-2">Nama</th>
+            <th class="py-2 pr-2 hidden sm:table-cell">No. HP</th>
+            <th class="py-2 pr-2">Kelompok</th>
+            <th class="py-2 pr-2">Status</th>
+            <th class="py-2 pr-2 text-right">Aksi</th>
+          </tr></thead>
+          <tbody id="memberTbody"></tbody>
+        </table>
+      </div>
+      <div id="memberEmpty" class="hidden text-center text-gray-400 py-12">
+        <i class="fa-solid fa-users text-5xl text-gray-600 mb-3"></i>
+        <div class="font-semibold text-gray-300">Belum Ada Anggota</div>
+        <p class="text-xs mt-1">Klik "Tambah Anggota" untuk mulai</p>
+      </div>
+    </section>`;
+
+  renderMemberRows(state.cache.members);
+  document.getElementById('memberSearch').addEventListener('input', filterMembers);
+  document.getElementById('memberFilter').addEventListener('change', filterMembers);
+  document.getElementById('memberGroupFilter').addEventListener('change', filterMembers);
+  document.getElementById('addMemberBtn').addEventListener('click', () => showMemberModal(null));
+}
+
+function filterMembers() {
+  const q = document.getElementById('memberSearch').value.toLowerCase();
+  const st = document.getElementById('memberFilter').value;
+  const gid = document.getElementById('memberGroupFilter').value;
+  let list = state.cache.members;
+  if (st !== 'all') list = list.filter(m => m.status === st);
+  if (gid !== 'all') list = list.filter(m => (m.groups || []).some(g => g.group_id === gid));
+  if (q) list = list.filter(m =>
+    String(m.name).toLowerCase().includes(q) ||
+    String(m.number).includes(q) ||
+    String(m.phone).includes(q)
+  );
+  renderMemberRows(list);
+}
+
+function renderMemberRows(list) {
+  const tbody = document.getElementById('memberTbody');
+  const empty = document.getElementById('memberEmpty');
+  if (!list.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  tbody.innerHTML = list.map(m => {
+    const groupsHtml = (m.groups && m.groups.length)
+      ? m.groups.map(g => `<span class="inline-block text-[10px] bg-purple-900/40 text-purple-300 ring-1 ring-purple-700/50 px-1.5 py-0.5 rounded-full mr-1 mb-1">${escapeHtml(g.group_name)}</span>`).join('')
+      : '<span class="text-xs text-gray-500 italic">Belum ikut</span>';
+    const statusBadgeHtml = m.status === 'active'
+      ? '<span class="inline-block text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-900/50 text-emerald-300 ring-1 ring-emerald-700/50">Aktif</span>'
+      : '<span class="inline-block text-xs px-2 py-0.5 rounded-full font-medium bg-gray-700 text-gray-400 ring-1 ring-gray-600">Nonaktif</span>';
+    return `
+    <tr class="border-b border-gray-700 hover:bg-gray-700/50">
+      <td class="py-2 pr-2 font-bold text-blue-400">${escapeHtml(String(m.number).padStart(2, '0'))}</td>
+      <td class="py-2 pr-2 font-medium text-gray-100">${escapeHtml(m.name)}</td>
+      <td class="py-2 pr-2 hidden sm:table-cell text-gray-400">${escapeHtml(m.phone || '-')}</td>
+      <td class="py-2 pr-2 max-w-[200px]">${groupsHtml}</td>
+      <td class="py-2 pr-2">${statusBadgeHtml}</td>
+      <td class="py-2 pr-2 text-right whitespace-nowrap">
+        <button data-edit-member="${m.id}" class="text-blue-400 hover:text-blue-300 text-xs font-semibold mr-2"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button data-del-member="${m.id}" class="text-red-400 hover:text-red-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i> Hapus</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  tbody.querySelectorAll('[data-edit-member]').forEach(b => b.addEventListener('click', () => {
+    const m = state.cache.members.find(x => x.id === b.dataset.editMember);
+    if (m) showMemberModal(m);
+  }));
+  tbody.querySelectorAll('[data-del-member]').forEach(b => b.addEventListener('click', () => confirmDeleteMember(b.dataset.delMember)));
+}
+
+function filterMembers() {
+  const q = $('memberSearch').value.toLowerCase();
+  const st = $('memberFilter').value;
+  const gid = $('memberGroupFilter').value;
+  let list = state.cache.members;
+  if (st !== 'all') list = list.filter(m => m.status === st);
+  if (gid !== 'all') list = list.filter(m => (m.groups || []).some(g => g.group_id === gid));
+  if (q) list = list.filter(m => String(m.name).toLowerCase().includes(q) || String(m.number).includes(q) || String(m.phone).includes(q));
+  renderMemberRows(list);
+}
+
+function renderMemberRows(list) {
+  const tbody = $('memberTbody');
+  const empty = $('memberEmpty');
+  if (!list.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  tbody.innerHTML = list.map(m => {
+    const groupsHtml = (m.groups && m.groups.length)
+      ? m.groups.map(g => `<span class="inline-block text-[10px] bg-purple-900/40 text-purple-300 ring-1 ring-purple-700/50 px-1.5 py-0.5 rounded-full mr-1 mb-1">${escapeHtml(g.group_name)}</span>`).join('')
+      : '<span class="text-xs text-gray-500 italic">Belum ikut</span>';
+    return `
+    <tr class="border-b border-gray-700 hover:bg-gray-700/50">
+      <td class="py-2 pr-2 font-bold text-blue-400">${escapeHtml(String(m.number).padStart(2, '0'))}</td>
+      <td class="py-2 pr-2 font-medium text-gray-100">${escapeHtml(m.name)}</td>
+      <td class="py-2 pr-2 hidden sm:table-cell text-gray-400">${escapeHtml(m.phone || '-')}</td>
+      <td class="py-2 pr-2 max-w-[200px]">${groupsHtml}</td>
+      <td class="py-2 pr-2">${statusBadge(m.status)}</td>
+      <td class="py-2 pr-2 text-right whitespace-nowrap">
+        <button data-edit-member="${m.id}" class="text-blue-400 hover:text-blue-300 text-xs font-semibold mr-2"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button data-del-member="${m.id}" class="text-red-400 hover:text-red-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i> Hapus</button>
+      </td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('[data-edit-member]').forEach(b => b.addEventListener('click', () => {
+    const m = state.cache.members.find(x => x.id === b.dataset.editMember);
+    if (m) showMemberModal(m);
+  }));
+  tbody.querySelectorAll('[data-del-member]').forEach(b => b.addEventListener('click', () => confirmDeleteMember(b.dataset.delMember)));
+}
+
+function showMemberModal(m) {
+  const isEdit = !!m;
+  const nextNumber = state.cache.members.reduce((mx, x) => Math.max(mx, Number(x.number) || 0), 0) + 1;
+  const myGroupIds = isEdit ? (m.groups || []).map(g => g.group_id) : [];
+
+  openModal(isEdit ? 'Edit Anggota' : 'Tambah Anggota', `
+    <form id="memberForm" class="space-y-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Nomor Anggota</label>
+        <input id="mNumber" type="number" min="1" value="${isEdit ? m.number : nextNumber}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Status</label>
+        <select id="mStatus" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm">
+          <option value="active" ${isEdit && m.status === 'active' ? 'selected' : ''}>Aktif</option>
+          <option value="inactive" ${isEdit && m.status === 'inactive' ? 'selected' : ''}>Nonaktif</option>
+        </select></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Nama Lengkap *</label>
+      <input id="mName" type="text" value="${isEdit ? escapeHtml(m.name) : ''}" required class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-sm"></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">No. HP</label>
+        <input id="mPhone" type="text" value="${isEdit ? escapeHtml(m.phone || '') : ''}" placeholder="08xxx" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 focus:border-blue-500 outline-none text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+        <input id="mEmail" type="email" value="${isEdit ? escapeHtml(m.email || '') : ''}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Alamat</label>
+      <textarea id="mAddress" rows="2" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm">${isEdit ? escapeHtml(m.address || '') : ''}</textarea></div>
+
+      <div class="border-t border-gray-700 pt-3">
+        <label class="block text-sm font-medium text-gray-300 mb-2"><i class="fa-solid fa-users"></i> Kelompok yang Diikuti</label>
+        ${state.cache.groups.length ? `
+          <div class="max-h-40 overflow-y-auto border border-gray-600 rounded-lg p-2 space-y-1 bg-gray-700/50">
+            ${state.cache.groups.map(g => {
+              const isDisabled = !isEdit && (g.putaran_aktif > 1);
+              return `
+              <label class="flex items-center gap-2 px-2 py-1 rounded ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-700 cursor-pointer'}">
+                <input type="checkbox" value="${g.id}" class="member-group-chk rounded bg-gray-700 border-gray-600" ${myGroupIds.indexOf(g.id) !== -1 ? 'checked' : ''} ${isDisabled ? 'disabled' : ''}>
+                <span class="text-sm text-gray-200">${escapeHtml(g.name)}</span>
+                ${isDisabled ? '<span class="text-[10px] text-red-400 ml-auto">Putaran ' + (g.putaran_aktif || 0) + '</span>' : '<span class="text-xs text-gray-500 ml-auto">' + g.period_days + 'h</span>'}
+              </label>`;
+            }).join('')}
+          </div>
+          <p class="text-[11px] text-gray-500 mt-1">Kelompok yang sudah masuk Putaran 2+ tidak bisa ditambahi anggota.</p>
+        ` : '<p class="text-xs text-gray-500 italic">Belum ada kelompok.</p>'}
+      </div>
+
+      <div class="flex gap-2 justify-end pt-2">
+        <button type="button" data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+        <button type="submit" id="mSave" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Simpan</button>
+      </div>
+    </form>`);
+
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+
+  document.getElementById('memberForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      number: Number(document.getElementById('mNumber').value) || 0,
+      name: document.getElementById('mName').value.trim(),
+      phone: document.getElementById('mPhone').value.trim(),
+      email: document.getElementById('mEmail').value.trim(),
+      address: document.getElementById('mAddress').value.trim(),
+      status: document.getElementById('mStatus').value,
+      group_ids: Array.from(document.querySelectorAll('.member-group-chk:checked')).map(c => c.value)
+    };
+    if (!data.name) { toast('Nama wajib diisi.', 'error'); return; }
+
+    const btn = document.getElementById('mSave');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    pauseIdle();
+    try {
+      const res = isEdit
+        ? await state.membersModule.updateMember(m.id, data)
+        : await state.membersModule.createMember(data);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+        await loadAllData();
+        switchView('members');
+      } else toast(res.message, 'error');
+    } catch (err) {
+      console.error(err);
+      toast('Terjadi kesalahan.', 'error');
+    }
+    finally { btn.disabled = false; btn.textContent = 'Simpan'; resumeIdle(); }
+  });
+}
+
+function confirmDeleteMember(id) {
+  const m = state.cache.members.find(x => x.id === id);
+  if (!m) return;
+  openModal('Hapus Anggota', `
+    <p class="text-sm text-gray-300">Yakin ingin menghapus <strong class="text-gray-100">${escapeHtml(m.name)}</strong> (No. ${m.number})?</p>
+    <p class="text-xs text-red-400 mt-2"><i class="fa-solid fa-triangle-exclamation"></i> Anggota akan dihapus dari semua kelompok yang diikuti.</p>
+    <div class="flex gap-2 justify-end pt-5">
+      <button data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+      <button id="confirmDel" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Hapus</button>
+    </div>`);
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  document.getElementById('confirmDel').addEventListener('click', async () => {
+    const btn = document.getElementById('confirmDel');
+    btn.disabled = true; btn.textContent = 'Menghapus...';
+    pauseIdle();
+    try {
+      const res = await state.membersModule.deleteMember(id);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+        await loadAllData();
+        switchView('members');
+      } else toast(res.message, 'error');
+    } catch (e) {
+      console.error(e);
+      toast('Terjadi kesalahan.', 'error');
+    }
+    finally { btn.disabled = false; btn.textContent = 'Hapus'; resumeIdle(); }
+  });
+}
+
+/* ============================================================
+   GROUPS
+   ============================================================ */
+async function renderGroups() {
+  try {
+    const res = await state.groupsModule.getGroups();
+    if (res.ok) state.cache.groups = res.data;
+  } catch (e) {
+    console.error('Refresh groups error:', e);
+  }
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-gray-100">Daftar Kelompok</h3>
+        <button id="addGroupBtn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-sm transition"><i class="fa-solid fa-plus"></i> Tambah</button>
+      </div>
+      <div id="groupList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      <div id="groupEmpty" class="hidden text-center text-gray-400 py-12">
+        <i class="fa-solid fa-calendar-days text-5xl text-gray-600 mb-3"></i>
+        <div class="font-semibold text-gray-300">Belum Ada Kelompok Arisan</div>
+        <p class="text-xs mt-1">Klik "Tambah" untuk membuat kelompok pertama</p>
+      </div>
+    </section>`;
+  renderGroupCards(state.cache.groups);
+  document.getElementById('addGroupBtn').addEventListener('click', () => showGroupModal(null));
+}
+
+function renderGroupCards(list) {
+  const box = document.getElementById('groupList');
+  const empty = document.getElementById('groupEmpty');
+  if (!list.length) { box.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  box.innerHTML = list.map(g => {
+    const canAdd = (g.putaran_aktif || 1) <= 1;
+    return `
+    <article class="border border-gray-700 rounded-xl p-4 hover:shadow-lg hover:border-gray-600 transition bg-gray-800">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <h4 class="font-bold text-gray-100 truncate">${escapeHtml(g.name)}</h4>
+          <p class="text-xs text-gray-400 mt-1">${escapeHtml(g.description || 'Tanpa deskripsi')}</p>
+        </div>
+        <span class="inline-block text-xs px-2 py-0.5 rounded-full font-medium ${g.status === 'active' ? 'bg-emerald-900/50 text-emerald-300 ring-1 ring-emerald-700/50' : 'bg-gray-700 text-gray-400 ring-1 ring-gray-600'}">
+          ${g.status === 'active' ? 'Aktif' : 'Nonaktif'}
+        </span>
+      </div>
+      <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <div class="bg-blue-900/40 rounded-lg p-2 ring-1 ring-blue-700/30"><div class="text-blue-300"><i class="fa-solid fa-users"></i> Anggota</div><div class="font-bold text-blue-200">${g.member_count || 0} orang</div></div>
+        <div class="bg-amber-900/40 rounded-lg p-2 ring-1 ring-amber-700/30"><div class="text-amber-300"><i class="fa-solid fa-money-bill-wave"></i> Iuran</div><div class="font-bold text-amber-200">${formatIDR(g.amount)}</div></div>
+        <div class="bg-emerald-900/40 rounded-lg p-2 ring-1 ring-emerald-700/30"><div class="text-emerald-300"><i class="fa-solid fa-calendar-days"></i> Periode</div><div class="font-bold text-emerald-200">${g.period_days} hari</div></div>
+        <div class="bg-purple-900/40 rounded-lg p-2 ring-1 ring-purple-700/30"><div class="text-purple-300"><i class="fa-solid fa-credit-card"></i> Tagihan</div><div class="font-bold text-purple-200">${g.paid_count || 0}/${g.payment_count || 0}</div></div>
+      </div>
+      <div class="text-xs text-gray-400 mt-2">
+        Mulai: ${formatDate(g.start_date)} •
+        Putaran aktif: <strong class="${(g.putaran_aktif || 1) <= 1 ? 'text-emerald-400' : 'text-blue-400'}">${g.putaran_aktif || 1}</strong>
+      </div>
+      <div class="grid grid-cols-4 gap-1.5 mt-3">
+        <button data-view-group="${g.id}" class="text-center px-2 py-1.5 rounded-lg bg-emerald-900/40 text-emerald-300 ring-1 ring-emerald-700/40 text-[11px] font-semibold hover:bg-emerald-900/60 transition"><i class="fa-solid fa-eye"></i> Detail</button>
+        <button data-manage-group="${g.id}" class="text-center px-2 py-1.5 rounded-lg ${canAdd ? 'bg-purple-900/40 text-purple-300 ring-1 ring-purple-700/40 hover:bg-purple-900/60' : 'bg-gray-700 text-gray-500 cursor-not-allowed'} text-[11px] font-semibold transition" ${canAdd ? '' : 'disabled'}><i class="fa-solid fa-users"></i> Anggota</button>
+        <button data-edit-group="${g.id}" class="text-center px-2 py-1.5 rounded-lg bg-blue-900/40 text-blue-300 ring-1 ring-blue-700/40 text-[11px] font-semibold hover:bg-blue-900/60 transition"><i class="fa-solid fa-pen"></i> Edit</button>
+        <button data-del-group="${g.id}" class="text-center px-2 py-1.5 rounded-lg bg-red-900/40 text-red-300 ring-1 ring-red-700/40 text-[11px] font-semibold hover:bg-red-900/60 transition"><i class="fa-solid fa-trash"></i> Hapus</button>
+      </div>
+      <button data-sync-pay="${g.id}" class="w-full mt-2 text-center px-2 py-1.5 rounded-lg bg-amber-900/40 text-amber-300 ring-1 ring-amber-700/40 text-[11px] font-semibold hover:bg-amber-900/60 transition"><i class="fa-solid fa-rotate"></i> Sync Tagihan</button>
+      ${!canAdd ? '<div class="text-[10px] text-amber-400 mt-2 text-center"><i class="fa-solid fa-lock"></i> Anggota hanya bisa ditambah di Putaran 1</div>' : ''}
+    </article>`;
+  }).join('');
+
+  box.querySelectorAll('[data-view-group]').forEach(b => b.addEventListener('click', () => showGroupDetail(b.dataset.viewGroup)));
+  box.querySelectorAll('[data-manage-group]').forEach(b => b.addEventListener('click', () => {
+    if (b.disabled) return;
+    showGroupMemberModal(b.dataset.manageGroup);
+  }));
+  box.querySelectorAll('[data-edit-group]').forEach(b => b.addEventListener('click', () => {
+    const g = state.cache.groups.find(x => x.id === b.dataset.editGroup);
+    if (g) showGroupModal(g);
+  }));
+  box.querySelectorAll('[data-del-group]').forEach(b => b.addEventListener('click', () => confirmDeleteGroup(b.dataset.delGroup)));
+  box.querySelectorAll('[data-sync-pay]').forEach(b => b.addEventListener('click', async () => {
+    const gid = b.dataset.syncPay;
+    if (!confirm('Sync tagihan kelompok ini?\n\nAkan:\n- Hapus tagihan untuk anggota yang tidak aktif\n- Tambah tagihan yang belum ada\n- Hapus tagihan putaran berlebih')) return;
+    
+    b.disabled = true;
+    const original = b.innerHTML;
+    b.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Sync...';
+    pauseIdle();
+    try {
+      const res = await state.paymentsModule.autoGeneratePayments(gid);
+      if (res.ok) {
+        toast(`Sync berhasil: +${res.created} baru, -${res.deleted} dihapus`, 'success');
+        await loadAllData();
+        switchView('groups');
+      } else {
+        toast(res.message || 'Sync gagal.', 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      toast('Terjadi kesalahan.', 'error');
+    } finally {
+      b.disabled = false;
+      b.innerHTML = original;
+      resumeIdle();
+    }
+  }));
+}
+
+function showGroupModal(g) {
+  const isEdit = !!g;
+  const today = new Date().toISOString().slice(0, 10);
+  openModal(isEdit ? 'Edit Kelompok' : 'Tambah Kelompok', `
+    <form id="groupForm" class="space-y-3">
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Nama Kelompok *</label>
+      <input id="gName" type="text" required value="${isEdit ? escapeHtml(g.name) : ''}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-sm"></div>
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Deskripsi</label>
+      <textarea id="gDesc" rows="2" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm">${isEdit ? escapeHtml(g.description || '') : ''}</textarea></div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Iuran (Rp) *</label>
+        <input id="gAmount" type="number" min="1000" required value="${isEdit ? g.amount : 100000}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Periode (hari) *</label>
+        <input id="gPeriod" type="number" min="1" max="365" required value="${isEdit ? g.period_days : 7}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm">
+        <p class="text-[11px] text-gray-500 mt-1">Bebas: 3, 7, 14, 21, 30 hari, dst.</p></div>
+      </div>
+      <div class="bg-blue-900/40 border border-blue-700/50 rounded-lg p-3 text-xs">
+        <div class="font-semibold text-blue-300 mb-1"><i class="fa-solid fa-calendar-days"></i> Preview Jatuh Tempo:</div>
+        <div id="periodPreview" class="text-blue-200">Isi periode & tanggal mulai untuk lihat preview.</div>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Tanggal Mulai</label>
+        <input id="gStart" type="date" value="${isEdit && g.start_date ? String(g.start_date).slice(0,10) : today}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Status</label>
+        <select id="gStatus" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm">
+          <option value="active" ${isEdit && g.status === 'active' ? 'selected' : ''}>Aktif</option>
+          <option value="inactive" ${isEdit && g.status === 'inactive' ? 'selected' : ''}>Nonaktif</option>
+        </select></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Izinkan Pemenang Berulang</label>
+      <select id="gRepeat" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm">
+        <option value="false" ${isEdit && String(g.allow_repeat_winner) === 'true' ? '' : 'selected'}>Tidak (setiap anggota menang 1x)</option>
+        <option value="true" ${isEdit && String(g.allow_repeat_winner) === 'true' ? 'selected' : ''}>Ya</option>
+      </select></div>
+
+      ${!isEdit ? `
+      <div class="border-t border-gray-700 pt-3">
+        <label class="block text-sm font-medium text-gray-300 mb-2"><i class="fa-solid fa-users"></i> Pilih Anggota yang Ikut (opsional)</label>
+        <div id="memberCheckList" class="max-h-48 overflow-y-auto border border-gray-600 rounded-lg p-2 space-y-1 bg-gray-700/50">
+          <div class="text-xs text-gray-400 text-center py-2">Memuat anggota...</div>
+        </div>
+      </div>` : ''}
+
+      <div class="flex gap-2 justify-end pt-2">
+        <button type="button" data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+        <button type="submit" id="gSave" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Simpan</button>
+      </div>
+    </form>`);
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+
+  const updatePreview = () => {
+    const period = Number($('gPeriod').value) || 7;
+    const startVal = $('gStart').value || today;
+    const start = new Date(startVal);
+    const previews = [];
+    for (let i = 1; i <= 6; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + (i - 1) * period);
+      previews.push('P' + i + ': ' + d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }));
+    }
+    $('periodPreview').innerHTML = previews.join(' • ') + ' ...';
+  };
+  $('gPeriod').addEventListener('input', updatePreview);
+  $('gStart').addEventListener('change', updatePreview);
+  updatePreview();
+
+  if (!isEdit) {
+    (async () => {
+      try {
+        const mres = await state.membersModule.getMembers({});
+        const cl = $('memberCheckList');
+        if (!cl) return;
+        if (!mres.ok || !mres.data.length) {
+          cl.innerHTML = '<div class="text-xs text-gray-400 text-center py-2">Belum ada anggota.</div>';
+          return;
+        }
+        cl.innerHTML = mres.data.map(m => `
+          <label class="flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-700 cursor-pointer">
+            <input type="checkbox" value="${m.id}" class="member-chk rounded bg-gray-700 border-gray-600">
+            <span class="font-bold text-blue-400 text-xs">${String(m.number).padStart(2, '0')}</span>
+            <span class="text-sm text-gray-200">${escapeHtml(m.name)}</span>
+          </label>`).join('');
+      } catch (e) { console.error(e); }
+    })();
+  }
+
+  $('groupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      name: $('gName').value.trim(),
+      description: $('gDesc').value.trim(),
+      amount: Number($('gAmount').value) || 0,
+      period_days: Number($('gPeriod').value) || 7,
+      start_date: $('gStart').value,
+      status: $('gStatus').value,
+      allow_repeat_winner: $('gRepeat').value
+    };
+    if (!data.name) { toast('Nama wajib diisi.', 'error'); return; }
+    if (data.amount <= 0) { toast('Jumlah iuran tidak valid.', 'error'); return; }
+    if (data.period_days < 1 || data.period_days > 365) { toast('Periode harus 1-365 hari.', 'error'); return; }
+    if (!isEdit) {
+      const checked = Array.from(document.querySelectorAll('.member-chk:checked')).map(c => c.value);
+      if (checked.length) data.member_ids = checked;
+    }
+    const btn = $('gSave');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    pauseIdle();
+    try {
+      const res = isEdit
+        ? await state.groupsModule.updateGroup(g.id, data)
+        : await state.groupsModule.createGroup(data);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+        await loadAllData();
+        switchView('groups');
+      } else toast(res.message, 'error');
+    } catch (err) { toast('Terjadi kesalahan.', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Simpan'; resumeIdle(); }
+  });
+}
+
+async function showGroupDetail(groupId) {
+  openModal('Detail Kelompok', '<div class="text-center py-6 text-gray-400">Memuat...</div>');
+  try {
+    const res = await state.groupsModule.getGroupById(groupId);
+    if (!res.ok) { toast(res.message, 'error'); closeModal(); return; }
+    const g = res.data;
+
+    $('modalTitle').textContent = 'Detail: ' + g.name;
+    $('modalBody').innerHTML = `
+      <div class="space-y-3">
+        <p class="text-sm text-gray-400">${escapeHtml(g.description || 'Tanpa deskripsi')}</p>
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <div class="bg-blue-900/40 rounded-lg p-2 text-center ring-1 ring-blue-700/30"><div class="text-blue-300">Anggota</div><div class="text-lg font-bold text-blue-200">${g.member_count}</div></div>
+          <div class="bg-emerald-900/40 rounded-lg p-2 text-center ring-1 ring-emerald-700/30"><div class="text-emerald-300">Iuran</div><div class="text-sm font-bold text-emerald-200">${formatIDR(g.amount)}</div></div>
+          <div class="bg-amber-900/40 rounded-lg p-2 text-center ring-1 ring-amber-700/30"><div class="text-amber-300">Periode</div><div class="text-lg font-bold text-amber-200">${g.period_days}h</div></div>
+        </div>
+        <div class="bg-purple-900/40 rounded-lg p-2 text-center text-xs ring-1 ring-purple-700/30">
+          <div class="text-purple-300">Putaran Aktif</div>
+          <div class="text-xl font-bold text-purple-200">${g.putaran_aktif || 1}</div>
+        </div>
+        <div class="border-t border-gray-700 pt-3">
+          <h4 class="font-semibold text-gray-100 text-sm mb-2"><i class="fa-solid fa-users"></i> Daftar Anggota (${g.member_count})</h4>
+          ${g.members.length ? `
+            <div class="max-h-64 overflow-y-auto border border-gray-700 rounded-lg">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-700 sticky top-0">
+                  <tr class="text-left text-gray-400 text-xs">
+                    <th class="py-2 px-3">No</th><th class="py-2 px-3">Nama</th>
+                    <th class="py-2 px-3 hidden sm:table-cell">HP</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${g.members.map(m => `
+                    <tr class="border-t border-gray-700">
+                      <td class="py-2 px-3 font-bold text-blue-400">${String(m.number).padStart(2, '0')}</td>
+                      <td class="py-2 px-3 font-medium text-gray-100">${escapeHtml(m.name)}</td>
+                      <td class="py-2 px-3 hidden sm:table-cell text-gray-400 text-xs">${escapeHtml(m.phone || '-')}</td>
+                    </tr>`).join('')}
+                </tbody>
+              </table>
+            </div>` : '<p class="text-sm text-gray-400 italic">Belum ada anggota.</p>'}
+        </div>
+        <div class="flex gap-2 justify-end pt-2 border-t border-gray-700">
+          ${g.can_add_member ? `<button id="modalManageBtn" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition"><i class="fa-solid fa-users"></i> Kelola Anggota</button>` : ''}
+          <button data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Tutup</button>
+        </div>
+      </div>`;
+    document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+    const mBtn = $('modalManageBtn');
+    if (mBtn) {
+      mBtn.addEventListener('click', () => {
+        closeModal();
+        setTimeout(() => showGroupMemberModal(groupId), 100);
+      });
+    }
+  } catch (e) { toast('Gagal memuat detail.', 'error'); }
+}
+
+async function showGroupMemberModal(groupId) {
+  openModal('Kelola Anggota Kelompok', '<div class="text-center py-6 text-gray-400">Memuat...</div>');
+  try {
+    const grpRes = await state.groupsModule.getGroupById(groupId);
+    const allMembersRes = await state.membersModule.getMembers({ status: 'active' });
+    const groupMembersRes = { ok: true, data: (grpRes.data?.members || []) };
+    if (!grpRes.ok) { toast(grpRes.message, 'error'); closeModal(); return; }
+    const g = grpRes.data;
+    const allMembers = allMembersRes.data || [];
+    const inGroupIds = (groupMembersRes.data || []).map(m => m.member_id);
+
+    $('modalTitle').textContent = g.name;
+    $('modalBody').innerHTML = `
+      <div class="space-y-3">
+        <div class="bg-blue-900/40 border border-blue-700/50 rounded-lg p-3 text-xs text-blue-200">
+          <strong>${inGroupIds.length}</strong> dari <strong>${allMembers.length}</strong> anggota terdaftar.
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <h4 class="font-semibold text-gray-100 text-sm">Daftar Anggota</h4>
+            <div class="flex gap-2">
+              <button id="checkAllBtn" class="text-xs text-blue-400 hover:text-blue-300 font-semibold">Pilih Semua</button>
+              <button id="uncheckAllBtn" class="text-xs text-gray-400 hover:text-gray-300 font-semibold">Kosongkan</button>
+            </div>
+          </div>
+          <div id="groupMembersList" class="max-h-72 overflow-y-auto border border-gray-600 rounded-lg divide-y divide-gray-700 bg-gray-700/50">
+            ${allMembers.length ? allMembers.map(m => {
+              const checked = inGroupIds.indexOf(m.id) !== -1;
+              return `
+                <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-700 cursor-pointer">
+                  <input type="checkbox" value="${m.id}" class="gm-chk rounded bg-gray-700 border-gray-600" ${checked ? 'checked' : ''}>
+                  <span class="font-bold text-blue-400 text-sm w-8">${String(m.number).padStart(2, '0')}</span>
+                  <span class="text-sm text-gray-100 flex-1">${escapeHtml(m.name)}</span>
+                  <span class="text-xs text-gray-500">${escapeHtml(m.phone || '')}</span>
+                </label>`;
+            }).join('') : '<div class="text-xs text-gray-400 text-center py-4">Belum ada anggota aktif.</div>'}
+          </div>
+        </div>
+        <div class="flex gap-2 justify-end pt-2 border-t border-gray-700">
+          <button data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+          <button id="saveGMBtn" class="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold transition">Simpan</button>
+        </div>
+      </div>`;
+    document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+
+    $('checkAllBtn').addEventListener('click', () => document.querySelectorAll('.gm-chk').forEach(c => c.checked = true));
+    $('uncheckAllBtn').addEventListener('click', () => document.querySelectorAll('.gm-chk').forEach(c => c.checked = false));
+
+    $('saveGMBtn').addEventListener('click', async () => {
+      const checked = Array.from(document.querySelectorAll('.gm-chk:checked')).map(c => c.value);
+      const btn = $('saveGMBtn');
+      btn.disabled = true; btn.textContent = 'Menyimpan...';
+      pauseIdle();
+      try {
+        const toAdd = checked.filter(id => inGroupIds.indexOf(id) === -1);
+        const toRemove = inGroupIds.filter(id => checked.indexOf(id) === -1);
+        if (toAdd.length) {
+          const res = await state.groupMembersModule.addMemberToGroup(groupId, toAdd);
+          if (!res.ok) { toast(res.message, 'error'); btn.disabled = false; btn.textContent = 'Simpan'; resumeIdle(); return; }
+        }
+        for (const mid of toRemove) {
+          await state.groupMembersModule.removeMemberFromGroup(groupId, mid);
+        }
+        toast('Tersimpan: +' + toAdd.length + ', -' + toRemove.length, 'success');
+        closeModal();
+        await loadAllData();
+        switchView('groups');
+      } catch (e) { toast('Terjadi kesalahan.', 'error'); }
+      finally { btn.disabled = false; btn.textContent = 'Simpan'; resumeIdle(); }
+    });
+  } catch (e) { toast('Gagal memuat.', 'error'); }
+}
+
+function confirmDeleteGroup(id) {
+  const g = state.cache.groups.find(x => x.id === id);
+  if (!g) return;
+  openModal('Hapus Kelompok', `
+    <p class="text-sm text-gray-300">Yakin ingin menghapus <strong class="text-gray-100">${escapeHtml(g.name)}</strong>?</p>
+    <p class="text-xs text-red-400 mt-2"><i class="fa-solid fa-triangle-exclamation"></i> Relasi anggota & data terkait akan ikut terhapus.</p>
+    <div class="flex gap-2 justify-end pt-5">
+      <button data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+      <button id="confirmDelG" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Hapus</button>
+    </div>`);
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  $('confirmDelG').addEventListener('click', async () => {
+    const btn = $('confirmDelG');
+    btn.disabled = true; btn.textContent = 'Menghapus...';
+    pauseIdle();
+    try {
+      const res = await state.groupsModule.deleteGroup(id);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+        await loadAllData();
+        switchView('groups');
+      } else toast(res.message, 'error');
+    } catch (e) { toast('Terjadi kesalahan.', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Hapus'; resumeIdle(); }
+  });
+}
+
+/* ============================================================
+   PAYMENTS (Grouped Accordion)
+   ============================================================ */
+const payUI = {
+  expandedGroups: {},
+  expandedPeriods: {},
+  filterGroup: 'all',
+  filterStatus: 'all',
+  filterSearch: ''
+};
+
+async function renderPayments() {
+  if (!state.cache.payments.length) {
+    const res = await state.paymentsModule.getPayments({});
+    if (res.ok) state.cache.payments = res.data;
+  }
+
+  payUI.expandedGroups = {};
+  payUI.expandedPeriods = {};
+  payUI.filterGroup = 'all';
+  payUI.filterStatus = 'all';
+  payUI.filterSearch = '';
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="space-y-3">
+      <div class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <div>
+            <h3 class="font-bold text-gray-100 text-lg flex items-center gap-2"><i class="fa-solid fa-credit-card text-blue-400"></i> Pembayaran</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Kelola status pembayaran per kelompok & putaran <span class="text-emerald-400">● live</span></p>
+          </div>
+          <button id="expandAllBtn" class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-semibold transition"><i class="fa-solid fa-up-down"></i> Buka/Tutup Semua</button>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <select id="payGroup" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+            <option value="all">Semua Kelompok</option>
+            ${state.cache.groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
+          </select>
+          <select id="payStatus" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+            <option value="all">Semua Status</option>
+            <option value="paid">Lunas</option>
+            <option value="partial">Sebagian</option>
+            <option value="unpaid">Belum Bayar</option>
+            <option value="pending">Menunggu</option>
+            <option value="rejected">Ditolak</option>
+          </select>
+          <input id="paySearch" type="text" placeholder="Cari anggota..." class="col-span-2 px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 text-sm focus:border-blue-500 outline-none">
+        </div>
+        <div id="payStats" class="grid grid-cols-4 gap-2 mt-3"></div>
+      </div>
+      <div id="payGroupList" class="space-y-3"></div>
+      <div id="payEmpty" class="hidden text-center text-gray-400 py-12 bg-gray-800 rounded-2xl border border-gray-700">
+        <i class="fa-solid fa-credit-card text-5xl text-gray-600 mb-3"></i>
+        <div class="font-semibold text-gray-300">Belum Ada Pembayaran</div>
+        <p class="text-xs mt-1">Tambahkan anggota ke kelompok untuk auto-generate tagihan</p>
+      </div>
+    </section>`;
+
+  renderPaymentsList();
+
+  document.getElementById('payGroup').addEventListener('change', () => { payUI.filterGroup = document.getElementById('payGroup').value; renderPaymentsList(); });
+  document.getElementById('payStatus').addEventListener('change', () => { payUI.filterStatus = document.getElementById('payStatus').value; renderPaymentsList(); });
+  document.getElementById('paySearch').addEventListener('input', (e) => { payUI.filterSearch = e.target.value.toLowerCase(); renderPaymentsList(); });
+  document.getElementById('expandAllBtn').addEventListener('click', toggleAllGroups);
+}
+
+function toggleAllGroups() {
+  const groups = state.cache.groups;
+  const allExpanded = groups.every(g => payUI.expandedGroups[g.id]);
+  groups.forEach(g => { payUI.expandedGroups[g.id] = !allExpanded; });
+  if (!allExpanded) Object.keys(payUI.expandedPeriods).forEach(k => { payUI.expandedPeriods[k] = false; });
+  renderPaymentsList();
+}
+
+function renderPaymentsList() {
+  let filtered = state.cache.payments.slice();
+  if (payUI.filterGroup !== 'all') filtered = filtered.filter(p => p.group_id === payUI.filterGroup);
+  if (payUI.filterStatus !== 'all') filtered = filtered.filter(p => p.status === payUI.filterStatus);
+  if (payUI.filterSearch) {
+    filtered = filtered.filter(p =>
+      String(p.member_name || '').toLowerCase().includes(payUI.filterSearch) ||
+      String(p.member_number || '').includes(payUI.filterSearch)
+    );
+  }
+
+  const total = filtered.length;
+  const paid = filtered.filter(p => p.status === 'paid').length;
+  const partial = filtered.filter(p => p.status === 'partial').length;
+  const unpaid = filtered.filter(p => p.status === 'unpaid').length;
+  const pending = filtered.filter(p => p.status === 'pending').length;
+  const rejected = filtered.filter(p => p.status === 'rejected').length;
+
+  const statsEl = document.getElementById('payStats');
+  if (!statsEl) return;
+
+  statsEl.innerHTML = `
+    <div class="bg-gray-700 rounded-lg p-2 text-center">
+      <div class="text-[10px] text-gray-400 uppercase font-semibold">Total</div>
+      <div class="text-base font-bold text-gray-100">${total}</div>
+    </div>
+    <div class="bg-emerald-900/40 rounded-lg p-2 text-center ring-1 ring-emerald-700/30">
+      <div class="text-[10px] text-emerald-300 uppercase font-semibold">Lunas</div>
+      <div class="text-base font-bold text-emerald-200">${paid}</div>
+    </div>
+    <div class="bg-blue-900/40 rounded-lg p-2 text-center ring-1 ring-blue-700/30">
+      <div class="text-[10px] text-blue-300 uppercase font-semibold">Sebagian</div>
+      <div class="text-base font-bold text-blue-200">${partial}</div>
+    </div>
+    <div class="bg-amber-900/40 rounded-lg p-2 text-center ring-1 ring-amber-700/30">
+      <div class="text-[10px] text-amber-300 uppercase font-semibold">Belum</div>
+      <div class="text-base font-bold text-amber-200">${unpaid + pending + rejected}</div>
+    </div>
+  `;
+
+  const byGroup = {};
+  filtered.forEach(p => {
+    if (!byGroup[p.group_id]) byGroup[p.group_id] = [];
+    byGroup[p.group_id].push(p);
+  });
+
+  let groupsToShow = state.cache.groups.slice();
+  if (payUI.filterGroup !== 'all') groupsToShow = groupsToShow.filter(g => g.id === payUI.filterGroup);
+  groupsToShow = groupsToShow.filter(g => byGroup[g.id] && byGroup[g.id].length > 0);
+
+  const list = document.getElementById('payGroupList');
+  const empty = document.getElementById('payEmpty');
+  if (!list) return;
+  if (groupsToShow.length === 0) { list.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+
+  list.innerHTML = groupsToShow.map(g => renderGroupAccordion(g, byGroup[g.id] || [])).join('');
+
+  list.querySelectorAll('[data-toggle-group]').forEach(el => {
+    el.addEventListener('click', () => {
+      const gid = el.dataset.toggleGroup;
+      payUI.expandedGroups[gid] = !payUI.expandedGroups[gid];
+      renderPaymentsList();
+    });
+  });
+  list.querySelectorAll('[data-toggle-period]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const key = el.dataset.togglePeriod;
+      payUI.expandedPeriods[key] = !payUI.expandedPeriods[key];
+      renderPaymentsList();
+    });
+  });
+  list.querySelectorAll('[data-pay-action]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const p = state.cache.payments.find(x => x.id === el.dataset.payAction);
+      if (p) showPaymentModal(p);
+    });
+  });
+  list.querySelectorAll('[data-wa-reminder]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const p = state.cache.payments.find(x => x.id === el.dataset.waReminder);
+      if (p) quickWaReminder(p);
+    });
+  });
+  list.querySelectorAll('[data-pay-partial]').forEach(el => {
+    el.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const p = state.cache.payments.find(x => x.id === el.dataset.payPartial);
+      if (p) showPartialModal(p);
+    });
+  });
+  list.querySelectorAll('[data-bulk-period]').forEach(el => {
+    el.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const [groupId, period] = el.dataset.bulkPeriod.split('|');
+      await bulkMarkPeriodPaid(groupId, Number(period));
+    });
+  });
+}
+
+function renderGroupAccordion(group, payments) {
+  const isExpanded = !!payUI.expandedGroups[group.id];
+  const total = payments.length;
+  const paid = payments.filter(p => p.status === 'paid').length;
+  const pending = payments.filter(p => p.status === 'pending').length;
+  const partial = payments.filter(p => p.status === 'partial').length;
+  const unpaid = payments.filter(p => p.status === 'unpaid').length;
+  const rejected = payments.filter(p => p.status === 'rejected').length;
+  const progress = total ? Math.round(paid / total * 100) : 0;
+
+  const byPeriod = {};
+  payments.forEach(p => {
+    const pn = Number(p.period_number) || 0;
+    if (!byPeriod[pn]) byPeriod[pn] = [];
+    byPeriod[pn].push(p);
+  });
+  const periods = Object.keys(byPeriod).map(Number).sort((a, b) => a - b);
+  const progressColor = progress >= 80 ? 'bg-emerald-500' : progress >= 50 ? 'bg-amber-500' : 'bg-red-500';
+  const progressTextColor = progress >= 80 ? 'text-emerald-400' : progress >= 50 ? 'text-amber-400' : 'text-red-400';
+
+  return `
+    <article class="bg-gray-800 rounded-2xl shadow-sm border border-gray-700 overflow-hidden">
+      <div data-toggle-group="${group.id}" class="cursor-pointer select-none p-4 hover:bg-gray-700/50 transition">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+              <i class="fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}"></i>
+            </div>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-bold text-gray-100 truncate">${escapeHtml(group.name)}</h3>
+              <div class="text-xs text-gray-400 mt-0.5">${group.period_days} hari • ${formatIDR(group.amount)} • ${periods.length} putaran</div>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="text-lg font-bold ${progressTextColor}">${progress}%</div>
+            <div class="text-[10px] text-gray-500 uppercase">Lunas</div>
+          </div>
+        </div>
+        <div class="mt-3 w-full h-1.5 bg-gray-700 rounded-full overflow-hidden">
+          <div class="h-full ${progressColor} transition-all duration-300" style="width: ${progress}%"></div>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+          <span class="bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full font-semibold">Total: ${total}</span>
+          <span class="bg-emerald-900/40 text-emerald-300 px-2 py-0.5 rounded-full font-semibold"><i class="fa-solid fa-check"></i> ${paid}</span>
+          ${partial ? `<span class="bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded-full font-semibold">◑ ${partial}</span>` : ''}
+          ${unpaid ? `<span class="bg-gray-600 text-gray-300 px-2 py-0.5 rounded-full font-semibold">○ ${unpaid}</span>` : ''}
+          ${pending ? `<span class="bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full font-semibold">◐ ${pending}</span>` : ''}
+          ${rejected ? `<span class="bg-red-900/40 text-red-300 px-2 py-0.5 rounded-full font-semibold">✗ ${rejected}</span>` : ''}
+        </div>
+      </div>
+      ${isExpanded ? `
+        <div class="border-t border-gray-700 bg-gray-900/50 p-3 space-y-2">
+          ${periods.map(pn => renderPeriodAccordion(group, pn, byPeriod[pn])).join('')}
+        </div>
+      ` : ''}
+    </article>`;
+}
+
+function renderPeriodAccordion(group, periodNumber, payments) {
+  const key = group.id + '_' + periodNumber;
+  const isExpanded = !!payUI.expandedPeriods[key];
+  const total = payments.length;
+  const paid = payments.filter(p => p.status === 'paid').length;
+  const pending = payments.filter(p => p.status === 'pending').length;
+  const partial = payments.filter(p => p.status === 'partial').length;
+  const unpaid = payments.filter(p => p.status === 'unpaid').length;
+  const allPaid = paid === total;
+  const progress = total ? Math.round(paid / total * 100) : 0;
+  const dueDate = payments[0] ? payments[0].due_date : '-';
+
+  return `
+    <div class="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+      <div data-toggle-period="${key}" class="cursor-pointer select-none p-3 flex items-center gap-3 hover:bg-gray-700/50 transition">
+        <span class="text-gray-400 text-xs"><i class="fa-solid ${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}"></i></span>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-gray-100 text-sm">Putaran ${periodNumber}</span>
+            ${allPaid
+              ? '<span class="text-[10px] bg-emerald-900/40 text-emerald-300 ring-1 ring-emerald-700/50 px-1.5 py-0.5 rounded-full font-bold"><i class="fa-solid fa-check"></i> LUNAS</span>'
+              : `<span class="text-[10px] bg-amber-900/40 text-amber-300 ring-1 ring-amber-700/50 px-1.5 py-0.5 rounded-full font-bold">${progress}%</span>`}
+          </div>
+          <div class="text-[11px] text-gray-400 mt-0.5">
+            JT: ${formatDate(dueDate)} • ${paid}/${total} lunas${partial ? ' • ' + partial + ' sebagian' : ''}${pending ? ' • ' + pending + ' menunggu' : ''}${unpaid ? ' • ' + unpaid + ' belum' : ''}
+          </div>
+        </div>
+        ${!allPaid ? `
+          <button data-bulk-period="${group.id}|${periodNumber}" class="text-[10px] bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded-lg font-semibold whitespace-nowrap transition" onclick="event.stopPropagation();">✓ Lunas Semua</button>
+        ` : ''}
+      </div>
+      ${isExpanded ? `
+        <div class="border-t border-gray-700 divide-y divide-gray-700">
+          ${payments.map(p => renderPaymentRowCompact(p)).join('')}
+        </div>
+      ` : ''}
+    </div>`;
+}
+
+function renderPaymentRowCompact(p) {
+  const statusMap = {
+    paid:     { label: 'Lunas',    cls: 'bg-emerald-900/40 text-emerald-300', icon: 'fa-circle-check' },
+    partial:  { label: 'Sebagian', cls: 'bg-blue-900/40 text-blue-300',       icon: 'fa-circle-half-stroke' },
+    unpaid:   { label: 'Belum',    cls: 'bg-gray-700 text-gray-300',          icon: 'fa-circle' },
+    pending:  { label: 'Menunggu', cls: 'bg-amber-900/40 text-amber-300',     icon: 'fa-clock' },
+    rejected: { label: 'Ditolak',  cls: 'bg-red-900/40 text-red-300',         icon: 'fa-circle-xmark' }
+  };
+  const s = statusMap[p.status] || statusMap.unpaid;
+  const isPaid = p.status === 'paid';
+  const paidAmount = Number(p.paid_amount || 0);
+  const remaining = Number(p.amount || 0) - paidAmount;
+  const hasPartial = paidAmount > 0 && !isPaid;
+
+  return `
+    <div class="px-3 py-2 flex items-center gap-2 hover:bg-gray-700/30 transition">
+      <div class="w-8 h-8 rounded-lg bg-blue-900/40 ring-1 ring-blue-700/40 flex items-center justify-center font-bold text-blue-300 text-xs flex-shrink-0">
+        ${escapeHtml(String(p.member_number || '-').padStart(2, '0'))}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-gray-100 truncate">${escapeHtml(p.member_name || '-')}</div>
+        <div class="text-[11px] text-gray-500">
+          ${formatIDR(p.amount)}
+          ${hasPartial ? `<span class="text-blue-400 font-semibold"> • dibayar ${formatIDR(paidAmount)}</span>` : ''}
+          ${hasPartial ? `<span class="text-red-400 font-semibold"> • sisa ${formatIDR(remaining)}</span>` : ''}
+        </div>
+      </div>
+      <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${s.cls} whitespace-nowrap ring-1 ring-inset ring-white/5"><i class="fa-solid ${s.icon}"></i> ${s.label}</span>
+      ${!isPaid ? `<button data-wa-reminder="${p.id}" title="WA reminder" class="text-emerald-400 hover:text-emerald-300 text-xs font-semibold px-1.5 py-1 rounded hover:bg-emerald-900/40 transition"><i class="fa-brands fa-whatsapp"></i></button>` : ''}
+      ${!isPaid ? `<button data-pay-partial="${p.id}" title="Bayar sebagian" class="text-blue-400 hover:text-blue-300 text-xs font-semibold px-1.5 py-1 rounded hover:bg-blue-900/40 transition"><i class="fa-solid fa-money-bill-wave"></i></button>` : ''}
+      <button data-pay-action="${p.id}" class="text-gray-400 hover:text-gray-200 text-xs font-semibold px-2 py-1 rounded hover:bg-gray-700 transition"><i class="fa-solid fa-pen-to-square"></i></button>
+    </div>`;
+}
+
+async function bulkMarkPeriodPaid(groupId, periodNumber) {
+  const target = state.cache.payments.filter(p =>
+    p.group_id === groupId && Number(p.period_number) === periodNumber && p.status !== 'paid'
+  );
+  if (!target.length) { toast('Semua pembayaran putaran ini sudah lunas.', 'info'); return; }
+  if (!confirm(`Tandai ${target.length} pembayaran di Putaran ${periodNumber} sebagai LUNAS?`)) return;
+
+  pauseIdle();
+  const res = await state.paymentsModule.bulkMarkPeriodPaid(groupId, periodNumber);
+  resumeIdle();
+  if (res.ok) {
+    toast(`Berhasil: ${res.updated} lunas`, 'success');
+  } else {
+    toast(res.message || 'Gagal.', 'error');
+  }
+}
+
+function showPaymentModal(p) {
+  const paidAmount = Number(p.paid_amount || 0);
+  const amount = Number(p.amount || 0);
+  const remaining = amount - paidAmount;
+
+  const statuses = [
+    { key: 'paid',     label: 'Lunas',      icon: 'fa-circle-check',         cls: 'bg-emerald-600 hover:bg-emerald-500', desc: 'Pembayaran diterima penuh' },
+    { key: 'partial',  label: 'Sebagian',   icon: 'fa-circle-half-stroke',   cls: 'bg-blue-600 hover:bg-blue-500',       desc: 'Baru dibayar sebagian' },
+    { key: 'pending',  label: 'Menunggu',   icon: 'fa-clock',                cls: 'bg-amber-600 hover:bg-amber-500',     desc: 'Menunggu verifikasi' },
+    { key: 'unpaid',   label: 'Belum Bayar',icon: 'fa-circle',               cls: 'bg-gray-600 hover:bg-gray-500',       desc: 'Belum membayar' },
+    { key: 'rejected', label: 'Tolak',      icon: 'fa-circle-xmark',         cls: 'bg-red-600 hover:bg-red-500',         desc: 'Pembayaran ditolak' }
+  ];
+
+  openModal('Ubah Status Pembayaran', `
+    <div class="space-y-4">
+      <div class="bg-gray-700/50 rounded-xl p-3 space-y-2">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-lg bg-blue-900/40 ring-1 ring-blue-700/40 flex items-center justify-center font-bold text-blue-300 text-sm">
+            ${escapeHtml(String(p.member_number || '-').padStart(2, '0'))}
+          </div>
+          <div class="flex-1">
+            <div class="font-semibold text-gray-100">${escapeHtml(p.member_name)}</div>
+            <div class="text-xs text-gray-400">${escapeHtml(p.group_name)} • Putaran ${p.period_number}</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs pt-2 border-t border-gray-600">
+          <div><div class="text-gray-400">Tagihan</div><div class="font-bold text-gray-100">${formatIDR(amount)}</div></div>
+          <div><div class="text-gray-400">Dibayar</div><div class="font-bold text-emerald-400">${formatIDR(paidAmount)}</div></div>
+          <div><div class="text-gray-400">Sisa</div><div class="font-bold text-red-400">${formatIDR(remaining)}</div></div>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <button id="modalWaBtn" class="flex-1 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition"><i class="fa-brands fa-whatsapp"></i> WhatsApp</button>
+        <button id="modalPartialBtn" class="flex-1 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"><i class="fa-solid fa-money-bill-wave"></i> Bayar Sebagian</button>
+      </div>
+
+      <div>
+        <div class="text-sm font-semibold text-gray-300 mb-2">Ubah ke status:</div>
+        <div class="space-y-2">
+          ${statuses.map(s => `
+            <button data-set="${s.key}" class="w-full text-left px-3 py-3 rounded-xl text-white font-semibold flex items-center gap-3 ${s.cls} transition ${p.status === s.key ? 'ring-2 ring-offset-1 ring-gray-500 ring-offset-gray-800' : ''}">
+              <i class="fa-solid ${s.icon} text-lg w-6 text-center"></i>
+              <div class="flex-1">
+                <div>${s.label}</div>
+                <div class="text-[11px] opacity-80 font-normal">${s.desc}</div>
+              </div>
+              ${p.status === s.key ? '<span class="text-[10px] bg-white/30 px-2 py-0.5 rounded-full">SAAT INI</span>' : ''}
+            </button>`).join('')}
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2 border-t border-gray-700">
+        <button type="button" data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm font-medium transition">Tutup</button>
+      </div>
+    </div>
+  `);
+
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  document.getElementById('modalWaBtn').addEventListener('click', () => quickWaReminder(p));
+  document.getElementById('modalPartialBtn').addEventListener('click', () => {
+    closeModal();
+    setTimeout(() => showPartialModal(p), 150);
+  });
+
+  document.querySelectorAll('#modal [data-set]').forEach(b => b.addEventListener('click', async () => {
+    const status = b.dataset.set;
+    if (status === p.status) { toast('Status tidak berubah.', 'info'); return; }
+    if (status === 'partial') {
+      closeModal();
+      setTimeout(() => showPartialModal(p), 150);
+      return;
+    }
+    b.disabled = true;
+    const original = b.innerHTML;
+    b.innerHTML = '<i class="fa-solid fa-spinner fa-spin text-lg w-6 text-center"></i> <div class="flex-1">Menyimpan...</div>';
+    pauseIdle();
+    try {
+      const res = await state.paymentsModule.updatePaymentStatus(p.id, status);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+      } else { toast(res.message, 'error'); b.disabled = false; b.innerHTML = original; }
+    } catch (e) { toast('Terjadi kesalahan.', 'error'); b.disabled = false; b.innerHTML = original; }
+    finally { resumeIdle(); }
+  }));
+}
+
+function showPartialModal(p) {
+  const paidAmount = Number(p.paid_amount || 0);
+  const amount = Number(p.amount || 0);
+  const remaining = amount - paidAmount;
+
+  openModal('Bayar Sebagian', `
+    <form id="partialForm" class="space-y-4">
+      <div class="bg-blue-900/40 border border-blue-700/50 rounded-xl p-3">
+        <div class="flex items-center gap-2">
+          <div class="w-9 h-9 rounded-lg bg-blue-800/50 ring-1 ring-blue-700/40 flex items-center justify-center font-bold text-blue-200 text-sm">
+            ${escapeHtml(String(p.member_number || '-').padStart(2, '0'))}
+          </div>
+          <div>
+            <div class="font-semibold text-gray-100">${escapeHtml(p.member_name)}</div>
+            <div class="text-xs text-gray-400">${escapeHtml(p.group_name)} • Putaran ${p.period_number}</div>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div class="bg-gray-700 rounded-lg p-2"><div class="text-[10px] text-gray-400 uppercase">Tagihan</div><div class="font-bold text-gray-100 text-sm">${formatIDR(amount)}</div></div>
+        <div class="bg-emerald-900/40 rounded-lg p-2 ring-1 ring-emerald-700/30"><div class="text-[10px] text-emerald-300 uppercase">Dibayar</div><div class="font-bold text-emerald-200 text-sm">${formatIDR(paidAmount)}</div></div>
+        <div class="bg-red-900/40 rounded-lg p-2 ring-1 ring-red-700/30"><div class="text-[10px] text-red-300 uppercase">Sisa</div><div class="font-bold text-red-200 text-sm">${formatIDR(remaining)}</div></div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1">Jumlah Cicilan Sekarang (Rp) *</label>
+        <input id="partialAmount" type="number" min="1" max="${remaining}" value="${remaining}"
+          class="w-full px-3 py-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-base font-bold focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none" autofocus>
+        <div class="flex gap-2 mt-2">
+          <button type="button" data-quick="${Math.round(remaining / 2)}" class="flex-1 text-xs px-2 py-1 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 font-semibold transition">Setengah</button>
+          <button type="button" data-quick="${remaining}" class="flex-1 text-xs px-2 py-1 rounded-lg bg-emerald-900/40 hover:bg-emerald-900/60 text-emerald-300 font-semibold transition ring-1 ring-emerald-700/40">Lunas</button>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1">Catatan (opsional)</label>
+        <input id="partialNotes" type="text" placeholder="Contoh: transfer BCA"
+          class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 text-sm focus:border-blue-500 outline-none">
+      </div>
+      <div class="flex gap-2 justify-end pt-2 border-t border-gray-700">
+        <button type="button" data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+        <button type="submit" id="partialSave" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+      </div>
+    </form>`);
+
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  document.querySelectorAll('#modal [data-quick]').forEach(el => el.addEventListener('click', () => { document.getElementById('partialAmount').value = el.dataset.quick; }));
+
+  document.getElementById('partialForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const amt = Number(document.getElementById('partialAmount').value);
+    const notes = document.getElementById('partialNotes').value.trim();
+    if (!amt || amt <= 0) { toast('Jumlah tidak valid.', 'error'); return; }
+    if (amt > remaining) { toast('Jumlah melebihi sisa tagihan.', 'error'); return; }
+
+    const btn = document.getElementById('partialSave');
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+    pauseIdle();
+    try {
+      const res = await state.paymentsModule.updatePaymentPartial(p.id, amt, notes);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+      } else { toast(res.message, 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan'; }
+    } catch (err) { toast('Terjadi kesalahan.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan'; }
+    finally { resumeIdle(); }
+  });
+}
+
+async function quickWaReminder(p) {
+  if (!p.member_phone) { toast('Nomor HP anggota belum diisi.', 'error'); return; }
+  let template = state.cache.settings.wa_template_reminder || 'Halo [nama], iuran [kelompok] Putaran [putaran] sebesar [jumlah] jatuh tempo [tanggal].';
+  const paidAmount = Number(p.paid_amount || 0);
+  const remaining = Number(p.amount || 0) - paidAmount;
+  const message = fillTemplate(template, {
+    nama: p.member_name || '',
+    kelompok: p.group_name || '',
+    putaran: p.period_number || '',
+    jumlah: formatIDR(remaining > 0 ? remaining : p.amount),
+    tanggal: formatDate(p.due_date),
+    total_tagihan: formatIDR(p.amount),
+    sudah_dibayar: formatIDR(paidAmount),
+    sisa: formatIDR(remaining)
+  });
+  const ok = openWhatsApp(p.member_phone, message);
+  if (ok) toast('Membuka WhatsApp...', 'success');
+}
+
+/* ============================================================
+   REMINDERS (Firebase)
+   ============================================================ */
+async function renderReminders() {
+  document.getElementById('mainContent').innerHTML = `
+    <section class="space-y-3">
+      <div class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+        <div class="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 class="font-bold text-gray-100 text-lg flex items-center gap-2"><i class="fa-brands fa-whatsapp text-emerald-400"></i> Reminder WhatsApp</h3>
+            <p class="text-xs text-gray-400 mt-0.5">Kirim pengingat ke anggota yang belum bayar</p>
+          </div>
+          <button id="editTemplateBtn" class="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-xs font-semibold transition"><i class="fa-solid fa-pen"></i> Template</button>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <select id="remGroup" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+            <option value="">Semua Kelompok</option>
+            ${state.cache.groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
+          </select>
+          <input id="remPeriod" type="number" min="1" placeholder="Putaran (kosong = semua)" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 text-sm focus:border-blue-500 outline-none">
+          <button id="loadRemBtn" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"><i class="fa-solid fa-magnifying-glass"></i> Tampilkan</button>
+        </div>
+      </div>
+      <div id="reminderResult"></div>
+    </section>`;
+
+  document.getElementById('loadRemBtn').addEventListener('click', loadReminders);
+  document.getElementById('editTemplateBtn').addEventListener('click', showTemplateEditor);
+  loadReminders();
+}
+
+async function loadReminders() {
+  const groupId = document.getElementById('remGroup').value;
+  const period = document.getElementById('remPeriod').value ? Number(document.getElementById('remPeriod').value) : null;
+  const box = document.getElementById('reminderResult');
+  box.innerHTML = '<div class="bg-gray-800 rounded-2xl p-8 text-center text-gray-400 text-sm shadow-sm border border-gray-700">Memuat...</div>';
+
+  try {
+    // Filter dari cache
+    let list = state.cache.payments.filter(p => p.status !== 'paid' && p.status !== 'rejected');
+    if (groupId) list = list.filter(p => p.group_id === groupId);
+    if (period) list = list.filter(p => Number(p.period_number) === period);
+
+    if (!list.length) {
+      box.innerHTML = '<div class="bg-emerald-900/40 border border-emerald-700/50 text-emerald-200 rounded-2xl p-6 text-center text-sm"><div class="text-4xl mb-2 text-emerald-400"><i class="fa-solid fa-circle-check"></i></div>Semua pembayaran sudah lunas!</div>';
+      return;
+    }
+
+    const byGroup = {};
+    list.forEach(item => {
+      const gname = item.group_name || '-';
+      if (!byGroup[gname]) byGroup[gname] = [];
+      byGroup[gname].push(item);
+    });
+
+    box.innerHTML = `
+      <div class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <div class="font-bold text-gray-100"><i class="fa-solid fa-clipboard-list text-blue-400"></i> ${list.length} anggota perlu diingatkan</div>
+            <div class="text-xs text-gray-400">Klik tombol per anggota atau kirim semua</div>
+          </div>
+          <button id="bulkSendBtn" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"><i class="fa-solid fa-paper-plane"></i> Kirim Semua</button>
+        </div>
+        ${Object.keys(byGroup).map(gname => `
+          <div class="mb-4 last:mb-0">
+            <div class="text-xs font-bold text-gray-400 uppercase mb-2"><i class="fa-solid fa-folder text-blue-400"></i> ${escapeHtml(gname)}</div>
+            <div class="space-y-1.5">
+              ${byGroup[gname].map(item => renderReminderRow(item)).join('')}
+            </div>
+          </div>`).join('')}
+      </div>`;
+
+    box.querySelectorAll('[data-wa-single]').forEach(el => {
+      el.addEventListener('click', () => {
+        const item = list.find(x => x.id === el.dataset.waSingle);
+        if (item) sendWaToMember(item);
+      });
+    });
+    document.getElementById('bulkSendBtn').addEventListener('click', () => sendBulkWa(list));
+  } catch (e) {
+    console.error(e);
+    box.innerHTML = '<div class="bg-red-900/40 text-red-200 rounded-2xl p-4 text-sm ring-1 ring-red-700/50">Terjadi kesalahan.</div>';
+  }
+}
+
+function renderReminderRow(item) {
+  const hasPhone = item.member_phone && item.member_phone.trim();
+  const isPartial = Number(item.paid_amount || 0) > 0;
+  const remaining = Number(item.amount || 0) - Number(item.paid_amount || 0);
+  return `
+    <div class="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-700 hover:bg-gray-700/50 transition">
+      <div class="w-8 h-8 rounded-lg bg-blue-900/40 ring-1 ring-blue-700/40 flex items-center justify-center font-bold text-blue-300 text-xs flex-shrink-0">
+        ${escapeHtml(String(item.member_number || '-').padStart(2, '0'))}
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm font-medium text-gray-100 truncate">${escapeHtml(item.member_name)}</div>
+        <div class="text-[11px] text-gray-500">
+          Putaran ${item.period_number} • ${isPartial ? 'sisa ' + formatIDR(remaining) : formatIDR(item.amount)} • JT ${formatDate(item.due_date)}
+        </div>
+      </div>
+      ${hasPhone
+        ? `<button data-wa-single="${item.id}" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold whitespace-nowrap transition"><i class="fa-brands fa-whatsapp"></i> Kirim</button>`
+        : `<span class="text-[10px] text-red-400 italic px-2">No HP kosong</span>`}
+    </div>`;
+}
+
+async function sendWaToMember(item) {
+  if (!item.member_phone) { toast('Nomor HP tidak ada.', 'error'); return; }
+  const settings = state.cache.settings || {};
+  let template = settings.wa_template_reminder || 'Halo [nama], iuran [kelompok] Putaran [putaran] sebesar [jumlah] jatuh tempo [tanggal].';
+  const paidAmount = Number(item.paid_amount || 0);
+  const remaining = Number(item.amount || 0) - paidAmount;
+  const message = fillTemplate(template, {
+    nama: item.member_name,
+    kelompok: item.group_name,
+    putaran: item.period_number,
+    jumlah: formatIDR(remaining > 0 ? remaining : item.amount),
+    tanggal: formatDate(item.due_date),
+    total_tagihan: formatIDR(item.amount),
+    sudah_dibayar: formatIDR(paidAmount),
+    sisa: formatIDR(remaining)
+  });
+  const ok = openWhatsApp(item.member_phone, message);
+  if (ok) toast('Membuka WhatsApp untuk ' + item.member_name, 'success');
+}
+
+async function sendBulkWa(list) {
+  const withPhone = list.filter(item => item.member_phone && item.member_phone.trim());
+  if (!withPhone.length) { toast('Tidak ada anggota dengan nomor HP.', 'error'); return; }
+  if (!confirm(`Buka WhatsApp untuk ${withPhone.length} anggota satu per satu?`)) return;
+
+  const btn = document.getElementById('bulkSendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Memproses...';
+  pauseIdle();
+
+  for (let i = 0; i < withPhone.length; i++) {
+    const item = withPhone[i];
+    try {
+      await sendWaToMember(item);
+      if (i < withPhone.length - 1) await new Promise(r => setTimeout(r, 1500));
+    } catch (e) { console.error(e); }
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Kirim Semua';
+  resumeIdle();
+  toast(`Selesai ${withPhone.length} WhatsApp.`, 'success');
+}
+
+async function showTemplateEditor() {
+  const s = state.cache.settings || {};
+  openModal('Edit Template WhatsApp', `
+    <form id="templateForm" class="space-y-3">
+      <div class="bg-blue-900/40 border border-blue-700/50 rounded-lg p-3 text-xs text-blue-200">
+        <strong>Variabel:</strong> [nama] • [kelompok] • [putaran] • [jumlah] • [tanggal] • [total_tagihan] • [sudah_dibayar] • [sisa]
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1"><i class="fa-brands fa-whatsapp text-emerald-400"></i> Template Reminder</label>
+        <textarea id="tplReminder" rows="6" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none font-mono">${escapeHtml(s.wa_template_reminder || '')}</textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1"><i class="fa-solid fa-circle-check text-emerald-400"></i> Template Lunas</label>
+        <textarea id="tplLunas" rows="4" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none font-mono">${escapeHtml(s.wa_template_lunas || '')}</textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-300 mb-1"><i class="fa-solid fa-trophy text-amber-400"></i> Template Pemenang</label>
+        <textarea id="tplPemenang" rows="4" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none font-mono">${escapeHtml(s.wa_template_pemenang || '')}</textarea>
+      </div>
+      <div class="flex gap-2 justify-end pt-2">
+        <button type="button" data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+        <button type="submit" id="tplSave" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Simpan</button>
+      </div>
+    </form>`);
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+
+  document.getElementById('templateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      wa_template_reminder: document.getElementById('tplReminder').value,
+      wa_template_lunas: document.getElementById('tplLunas').value,
+      wa_template_pemenang: document.getElementById('tplPemenang').value
+    };
+    const btn = document.getElementById('tplSave');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    pauseIdle();
+    try {
+      const res = await state.settingsModule.updateSettings(data);
+      if (res.ok) {
+        Object.assign(state.cache.settings, data);
+        toast('Template tersimpan.', 'success');
+        closeModal();
+      } else toast(res.message, 'error');
+    } catch (err) {
+      console.error(err);
+      toast('Terjadi kesalahan.', 'error');
+    }
+    finally { btn.disabled = false; btn.textContent = 'Simpan'; resumeIdle(); }
+  });
+}
+
+/* ============================================================
+   DRAW
+   ============================================================ */
+async function renderDraw() {
+  state.drawState = { groupId: '', period: 1, method: 'random', candidates: [], winner: null, animating: false };
+  $('mainContent').innerHTML = `
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-700">
+      <h2 class="text-lg font-bold text-gray-100 mb-1 flex items-center gap-2"><i class="fa-solid fa-dice text-purple-400"></i> Pengundian Pemenang</h2>
+      <p class="text-sm text-gray-400 mb-5">Pilih kelompok dan putaran, lalu tentukan metode pengundian.</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Kelompok Arisan</label>
+        <select id="drawGroup" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+          <option value="">-- Pilih Kelompok --</option>
+          ${state.cache.groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)} (${g.period_days} hari)</option>`).join('')}
+        </select></div>
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Putaran Ke</label>
+        <input id="drawPeriod" type="number" min="1" value="1" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none"></div>
+      </div>
+      <div id="candidateInfo" class="hidden mb-5 bg-blue-900/40 border border-blue-700/50 rounded-xl p-4 text-sm"></div>
+      <div class="mb-5">
+        <div class="text-sm font-medium text-gray-300 mb-2">Metode Pengundian</div>
+        <div class="grid grid-cols-3 gap-2">
+          <button data-method="random" class="method-btn px-3 py-2 rounded-lg border border-gray-600 text-gray-300 text-sm font-semibold transition"><i class="fa-solid fa-shuffle"></i> Random</button>
+          <button data-method="number" class="method-btn px-3 py-2 rounded-lg border border-gray-600 text-gray-300 text-sm font-semibold transition"><i class="fa-solid fa-hashtag"></i> Nomor</button>
+          <button data-method="predetermined" class="method-btn px-3 py-2 rounded-lg border border-gray-600 text-gray-300 text-sm font-semibold transition"><i class="fa-solid fa-thumbtack"></i> Ditentukan</button>
+        </div>
+      </div>
+      <div id="methodPanel" class="mb-5"></div>
+      <div id="drawStage" class="hidden text-center bg-gradient-to-br from-blue-900/40 to-emerald-900/40 rounded-2xl p-6 sm:p-10 border border-blue-700/50">
+        <div id="drawStageContent"></div>
+      </div>
+    </section>`;
+  $('drawGroup').addEventListener('change', onDrawGroupChange);
+  $('drawPeriod').addEventListener('input', onDrawPeriodChange);
+  document.querySelectorAll('.method-btn').forEach(b => b.addEventListener('click', () => setMethod(b.dataset.method)));
+  setMethod('random');
+}
+
+async function onDrawGroupChange() {
+  state.drawState.groupId = $('drawGroup').value;
+  state.drawState.period = Number($('drawPeriod').value) || 1;
+  await loadCandidates();
+}
+async function onDrawPeriodChange() {
+  state.drawState.period = Number($('drawPeriod').value) || 1;
+  await loadCandidates();
+}
+async function loadCandidates() {
+  const infoBox = $('candidateInfo');
+  if (!state.drawState.groupId) { infoBox.classList.add('hidden'); return; }
+  try {
+    const res = await apiCall('getCandidates', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period });
+    if (!res.ok) { toast(res.message, 'error'); infoBox.classList.add('hidden'); return; }
+    const d = res.data;
+    state.drawState.candidates = d.candidates;
+    infoBox.classList.remove('hidden');
+    infoBox.innerHTML = `
+      <div class="grid grid-cols-3 gap-2 text-center">
+        <div><div class="text-xs text-gray-400">Total Anggota</div><div class="text-lg font-bold text-gray-100">${d.totalMembers}</div></div>
+        <div><div class="text-xs text-gray-400">Sudah Menang</div><div class="text-lg font-bold text-amber-400">${d.totalWinners}</div></div>
+        <div><div class="text-xs text-gray-400">Kandidat Sisa</div><div class="text-lg font-bold text-blue-400">${d.remaining}</div></div>
+      </div>
+      ${d.allowRepeat ? '<div class="text-xs text-emerald-300 mt-2 text-center">Kelompok mengizinkan pemenang berulang.</div>' : '<div class="text-xs text-gray-400 mt-2 text-center">Anggota yang sudah menang tidak muncul lagi.</div>'}`;
+    renderMethodPanel();
+  } catch (e) { toast('Gagal memuat kandidat.', 'error'); }
+}
+
+function setMethod(method) {
+  state.drawState.method = method;
+  document.querySelectorAll('.method-btn').forEach(b => {
+    if (b.dataset.method === method) {
+      b.classList.add('bg-blue-600','text-white','border-blue-500');
+      b.classList.remove('text-gray-300','border-gray-600');
+    } else {
+      b.classList.remove('bg-blue-600','text-white','border-blue-500');
+      b.classList.add('text-gray-300','border-gray-600');
+    }
+  });
+  renderMethodPanel();
+}
+
+function renderMethodPanel() {
+  const panel = $('methodPanel');
+  if (!panel) return;
+  if (!state.drawState.groupId) {
+    panel.innerHTML = '<div class="text-sm text-gray-400 bg-gray-700/50 border border-gray-600 rounded-lg p-3">Silakan pilih kelompok terlebih dahulu.</div>';
+    return;
+  }
+  if (state.drawState.method === 'random') {
+    panel.innerHTML = `<button id="startDrawBtn" class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white font-bold shadow-md transition"><i class="fa-solid fa-dice"></i> Mulai Pengundian Acak</button>`;
+    $('startDrawBtn').addEventListener('click', startRandomDraw);
+  } else if (state.drawState.method === 'number') {
+    panel.innerHTML = `
+      <label class="block text-sm font-medium text-gray-300 mb-1">Nomor Pemenang</label>
+      <div class="flex gap-2">
+        <input id="drawNumber" type="number" min="1" placeholder="Contoh: 3" class="flex-1 px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 text-sm focus:border-blue-500 outline-none">
+        <button id="drawByNumberBtn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Tetapkan</button>
+      </div>`;
+    $('drawByNumberBtn').addEventListener('click', drawByNumber);
+  } else {
+    panel.innerHTML = `
+      <label class="block text-sm font-medium text-gray-300 mb-1">Pilih Pemenang</label>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <select id="drawMember" class="flex-1 px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+          <option value="">-- Pilih Anggota --</option>
+          ${state.drawState.candidates.map(m => `<option value="${m.id}">No. ${m.number} — ${escapeHtml(m.name)}</option>`).join('')}
+        </select>
+        <button id="drawPredBtn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Tetapkan Pemenang</button>
+      </div>`;
+    $('drawPredBtn').addEventListener('click', drawPredetermined);
+  }
+}
+
+async function startRandomDraw() {
+  if (state.drawState.animating) return;
+  if (!state.drawState.groupId) { toast('Data kelompok belum dipilih.', 'error'); return; }
+  if (!state.drawState.candidates.length) { toast('Belum ada kandidat yang tersedia.', 'error'); return; }
+  state.drawState.animating = true;
+  pauseIdle();
+  const stage = $('drawStage');
+  stage.classList.remove('hidden');
+  $('drawStageContent').innerHTML = `
+    <div class="text-sm text-gray-400 mb-2 flex items-center justify-center gap-2"><i class="fa-solid fa-dice fa-spin"></i> Mengundi...</div>
+    <div id="rollNumber" class="text-5xl sm:text-6xl font-extrabold text-blue-400">--</div>
+    <div id="rollName" class="text-xl sm:text-2xl font-bold text-gray-100 mt-2">Memilih kandidat...</div>`;
+  const rollNumber = $('rollNumber');
+  const rollName = $('rollName');
+  const candidates = state.drawState.candidates;
+  let ticks = 0;
+  const interval = setInterval(() => {
+    const r = candidates[Math.floor(Math.random() * candidates.length)];
+    rollNumber.textContent = String(r.number).padStart(2, '0');
+    rollName.textContent = r.name;
+    ticks++;
+    if (ticks >= 30) { clearInterval(interval); finalizeRandomDraw(); }
+  }, 90);
+}
+
+async function finalizeRandomDraw() {
+  const stage = $('drawStage');
+  try {
+    const res = await apiCall('drawRandomWinner', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period, notes: '' });
+    if (!res.ok) { stage.classList.add('hidden'); toast(res.message, 'error'); state.drawState.animating = false; resumeIdle(); return; }
+    renderWinnerResult(res.data, 'random');
+  } catch (e) { stage.classList.add('hidden'); toast('Terjadi kesalahan.', 'error'); }
+  finally { state.drawState.animating = false; resumeIdle(); }
+}
+
+async function drawByNumber() {
+  const num = Number($('drawNumber').value);
+  if (!num) { toast('Nomor anggota tidak valid.', 'error'); return; }
+  pauseIdle();
+  try {
+    const res = await apiCall('drawWinnerByNumber', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period, memberNumber: num, notes: '' });
+    if (!res.ok) { toast(res.message, 'error'); return; }
+    $('drawStage').classList.remove('hidden');
+    renderWinnerResult(res.data, 'number');
+  } catch (e) { toast('Terjadi kesalahan.', 'error'); }
+  finally { resumeIdle(); }
+}
+
+async function drawPredetermined() {
+  const mid = $('drawMember').value;
+  if (!mid) { toast('Anggota belum dipilih.', 'error'); return; }
+  pauseIdle();
+  try {
+    const res = await apiCall('setPredeterminedWinner', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period, memberId: mid, notes: '' });
+    if (!res.ok) { toast(res.message, 'error'); return; }
+    $('drawStage').classList.remove('hidden');
+    renderWinnerResult(res.data, 'predetermined');
+  } catch (e) { toast('Terjadi kesalahan.', 'error'); }
+  finally { resumeIdle(); }
+}
+
+function renderWinnerResult(w, method) {
+  const methodLabel = { random: 'Acak', number: 'Berdasarkan Nomor', predetermined: 'Sudah Ditentukan' }[method] || method;
+  state.drawState.winner = w;
+  $('drawStage').classList.remove('hidden');
+  $('drawStageContent').innerHTML = `
+    <div class="text-2xl sm:text-3xl font-extrabold text-emerald-400 mb-4 flex items-center justify-center gap-3"><i class="fa-solid fa-trophy"></i> PEMENANG! <i class="fa-solid fa-trophy"></i></div>
+    <div class="bg-gray-800 rounded-2xl shadow-lg p-6 inline-block min-w-[220px] border border-gray-700">
+      <div class="text-xs text-gray-400 uppercase tracking-wide">Nomor</div>
+      <div class="text-5xl font-extrabold text-blue-400">${escapeHtml(String(w.member_number).padStart(2, '0'))}</div>
+      <div class="text-2xl font-bold text-gray-100 mt-3">${escapeHtml(w.member_name)}</div>
+    </div>
+    <div class="mt-5 grid grid-cols-3 gap-2 text-xs sm:text-sm max-w-md mx-auto">
+      <div class="bg-gray-800/70 rounded-lg p-2 border border-gray-700"><div class="text-gray-400">Metode</div><div class="font-semibold text-gray-100">${methodLabel}</div></div>
+      <div class="bg-gray-800/70 rounded-lg p-2 border border-gray-700"><div class="text-gray-400">Putaran</div><div class="font-semibold text-gray-100">${escapeHtml(w.period_number)}</div></div>
+      <div class="bg-gray-800/70 rounded-lg p-2 border border-gray-700"><div class="text-gray-400">Tanggal</div><div class="font-semibold text-gray-100">${formatDate(w.drawn_at)}</div></div>
+    </div>
+    <div class="mt-6 flex flex-wrap gap-2 justify-center">
+      <button id="newDraw" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"><i class="fa-solid fa-rotate"></i> Pengundian Baru</button>
+      <button id="printDraw" class="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-semibold transition border border-gray-600"><i class="fa-solid fa-print"></i> Cetak</button>
+      <button id="goHistory" class="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition"><i class="fa-solid fa-list"></i> Riwayat</button>
+    </div>`;
+  $('newDraw').addEventListener('click', () => { loadAllData(); switchView('draw'); });
+  $('printDraw').addEventListener('click', () => window.print());
+  $('goHistory').addEventListener('click', async () => { await loadAllData(); switchView('winners'); });
+}
+
+/* ============================================================
+   WINNERS
+   ============================================================ */
+async function renderWinners() {
+  const res = await state.winnersModule.getWinnerHistory({});
+  if (res.ok) state.cache.winners = res.data;
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+      <div class="flex flex-col sm:flex-row gap-2 mb-4">
+        <select id="winGroup" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+          <option value="all">Semua Kelompok</option>
+          ${state.cache.groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
+        </select>
+        <select id="winMethod" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+          <option value="all">Semua Metode</option>
+          <option value="random">Acak</option><option value="number">Nomor</option><option value="predetermined">Ditentukan</option>
+        </select>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-400 border-b border-gray-700">
+            <th class="py-2 pr-2">Putaran</th><th class="py-2 pr-2">No</th><th class="py-2 pr-2">Nama</th>
+            <th class="py-2 pr-2 hidden sm:table-cell">Kelompok</th>
+            <th class="py-2 pr-2">Metode</th><th class="py-2 pr-2 hidden md:table-cell">Tanggal</th>
+            <th class="py-2 pr-2 text-right">Aksi</th>
+          </tr></thead><tbody id="winTbody"></tbody>
+        </table>
+      </div>
+      <div id="winEmpty" class="hidden text-center text-gray-400 py-12">
+        <i class="fa-solid fa-trophy text-5xl text-gray-600 mb-3"></i>
+        <div class="font-semibold text-gray-300">Belum Ada Pemenang</div>
+        <p class="text-xs mt-1">Lakukan pengundian di menu "Pengundian"</p>
+      </div>
+    </section>`;
+  renderWinnerRows(state.cache.winners);
+  document.getElementById('winGroup').addEventListener('change', filterWinners);
+  document.getElementById('winMethod').addEventListener('change', filterWinners);
+}
+
+function filterWinnersList() {
+  const g = document.getElementById('winGroup')?.value || 'all';
+  const m = document.getElementById('winMethod')?.value || 'all';
+  let list = state.cache.winners;
+  if (g !== 'all') list = list.filter(w => w.group_id === g);
+  if (m !== 'all') list = list.filter(w => w.draw_method === m);
+  return list;
+}
+
+function filterWinners() {
+  renderWinnerRows(filterWinnersList());
+}
+
+function renderWinnerRows(list) {
+  const tbody = document.getElementById('winTbody');
+  const empty = document.getElementById('winEmpty');
+  if (!tbody) return;
+  if (!list.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  const methodLabel = { random: 'Acak', number: 'Nomor', predetermined: 'Ditentukan' };
+  tbody.innerHTML = list.map(w => `
+    <tr class="border-b border-gray-700 hover:bg-gray-700/50">
+      <td class="py-2 pr-2 font-bold text-blue-400">${escapeHtml(w.period_number)}</td>
+      <td class="py-2 pr-2 font-bold text-gray-100">${escapeHtml(String(w.member_number).padStart(2, '0'))}</td>
+      <td class="py-2 pr-2 font-medium text-gray-100">${escapeHtml(w.member_name)}</td>
+      <td class="py-2 pr-2 hidden sm:table-cell text-gray-400">${escapeHtml(w.group_name || '-')}</td>
+      <td class="py-2 pr-2 text-gray-400">${methodLabel[w.draw_method] || w.draw_method}</td>
+      <td class="py-2 pr-2 hidden md:table-cell text-gray-400">${timestampToString(w.drawn_at)}</td>
+      <td class="py-2 pr-2 text-right whitespace-nowrap">
+        <button data-del-win="${w.id}" class="text-red-400 hover:text-red-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i> Hapus</button>
+      </td>
+    </tr>`).join('');
+  tbody.querySelectorAll('[data-del-win]').forEach(b => b.addEventListener('click', () => confirmDeleteWinner(b.dataset.delWin)));
+}
+
+function confirmDeleteWinner(id) {
+  const w = state.cache.winners.find(x => x.id === id);
+  if (!w) return;
+  openModal('Hapus Riwayat Pemenang', `
+    <p class="text-sm text-gray-300">Yakin ingin menghapus pemenang <strong class="text-gray-100">${escapeHtml(w.member_name)}</strong> pada putaran ${escapeHtml(w.period_number)}?</p>
+    <div class="flex gap-2 justify-end pt-5">
+      <button data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+      <button id="confirmDelW" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Hapus</button>
+    </div>`);
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  document.getElementById('confirmDelW').addEventListener('click', async () => {
+    const btn = document.getElementById('confirmDelW');
+    btn.disabled = true; btn.textContent = 'Menghapus...';
+    pauseIdle();
+    try {
+      const res = await state.winnersModule.deleteWinner(id);
+      if (res.ok) { toast(res.message, 'success'); closeModal(); }
+      else toast(res.message, 'error');
+    } catch (e) { toast('Terjadi kesalahan.', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Hapus'; resumeIdle(); }
+  });
+}
+
+/* ============================================================
+   FINANCE (Firebase)
+   ============================================================ */
+async function renderFinance() {
+  try {
+    const res = await state.transactionsModule.getTransactions({});
+    if (res.ok) state.cache.transactions = res.data;
+  } catch (e) {
+    console.error('Load transactions error:', e);
+  }
+
+  const data = state.cache.transactions;
+  const income = data.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+  const expense = data.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+      ${statCard('Total Pemasukan', formatIDR(income), 'fa-arrow-down', 'emerald')}
+      ${statCard('Total Pengeluaran', formatIDR(expense), 'fa-arrow-up', 'red')}
+      ${statCard('Saldo', formatIDR(income - expense), 'fa-wallet', 'blue')}
+    </section>
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700 mt-4">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-gray-100">Daftar Transaksi <span class="text-emerald-400 text-xs">● live</span></h3>
+        <button id="addTrxBtn" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-sm transition"><i class="fa-solid fa-plus"></i> Tambah</button>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-400 border-b border-gray-700">
+            <th class="py-2 pr-2">Tanggal</th><th class="py-2 pr-2">Tipe</th>
+            <th class="py-2 pr-2 hidden sm:table-cell">Kategori</th>
+            <th class="py-2 pr-2">Deskripsi</th><th class="py-2 pr-2 text-right">Jumlah</th>
+            <th class="py-2 pr-2 text-right">Aksi</th>
+          </tr></thead><tbody id="trxTbody"></tbody>
+        </table>
+      </div>
+      <div id="trxEmpty" class="hidden text-center text-gray-400 py-12">
+        <i class="fa-solid fa-wallet text-5xl text-gray-600 mb-3"></i>
+        <div class="font-semibold text-gray-300">Belum Ada Transaksi</div>
+        <p class="text-xs mt-1">Klik "Tambah" untuk mencatat pemasukan/pengeluaran</p>
+      </div>
+    </section>`;
+  renderTransactionRows(data);
+  document.getElementById('addTrxBtn').addEventListener('click', () => showTransactionModal(null));
+}
+
+function renderTransactionRows(list) {
+  const tbody = document.getElementById('trxTbody');
+  const empty = document.getElementById('trxEmpty');
+  if (!tbody) return;
+  if (!list.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  tbody.innerHTML = list.map(t => `
+    <tr class="border-b border-gray-700 hover:bg-gray-700/50">
+      <td class="py-2 pr-2 text-gray-400">${formatDate(t.transaction_date)}</td>
+      <td class="py-2 pr-2">${t.type === 'income' ? '<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-arrow-down"></i> Masuk</span>' : '<span class="text-red-400 font-semibold"><i class="fa-solid fa-arrow-up"></i> Keluar</span>'}</td>
+      <td class="py-2 pr-2 hidden sm:table-cell text-gray-400">${escapeHtml(t.category || '-')}</td>
+      <td class="py-2 pr-2 text-gray-100">${escapeHtml(t.description || '-')}</td>
+      <td class="py-2 pr-2 text-right font-medium ${t.type === 'income' ? 'text-emerald-400' : 'text-red-400'}">${t.type === 'income' ? '+' : '-'} ${formatIDR(t.amount)}</td>
+      <td class="py-2 pr-2 text-right whitespace-nowrap">
+        <button data-edit-trx="${t.id}" class="text-blue-400 hover:text-blue-300 text-xs font-semibold mr-2"><i class="fa-solid fa-pen"></i></button>
+        <button data-del-trx="${t.id}" class="text-red-400 hover:text-red-300 text-xs font-semibold"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>`).join('');
+  tbody.querySelectorAll('[data-edit-trx]').forEach(b => b.addEventListener('click', () => {
+    const t = state.cache.transactions.find(x => x.id === b.dataset.editTrx);
+    if (t) showTransactionModal(t);
+  }));
+  tbody.querySelectorAll('[data-del-trx]').forEach(b => b.addEventListener('click', () => confirmDeleteTransaction(b.dataset.delTrx)));
+}
+
+function showTransactionModal(t) {
+  const isEdit = !!t;
+  const today = new Date().toISOString().slice(0, 10);
+  openModal(isEdit ? 'Edit Transaksi' : 'Tambah Transaksi', `
+    <form id="trxForm" class="space-y-3">
+      <div class="grid grid-cols-2 gap-3">
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Tipe</label>
+        <select id="tType" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+          <option value="income" ${isEdit && t.type === 'income' ? 'selected' : ''}>Pemasukan</option>
+          <option value="expense" ${isEdit && t.type === 'expense' ? 'selected' : ''}>Pengeluaran</option>
+        </select></div>
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Jumlah (Rp) *</label>
+        <input id="tAmount" type="number" min="1" required value="${isEdit ? t.amount : ''}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+      </div>
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Kategori</label>
+      <input id="tCategory" type="text" value="${isEdit ? escapeHtml(t.category || '') : ''}" placeholder="kas, hadiah, operasional, dll" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Deskripsi</label>
+      <input id="tDesc" type="text" value="${isEdit ? escapeHtml(t.description || '') : ''}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+      <div><label class="block text-sm font-medium text-gray-300 mb-1">Tanggal</label>
+      <input id="tDate" type="date" value="${isEdit && t.transaction_date ? String(t.transaction_date).slice(0,10) : today}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+      <div class="flex gap-2 justify-end pt-2">
+        <button type="button" data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+        <button type="submit" id="tSave" class="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition">Simpan</button>
+      </div>
+    </form>`);
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  document.getElementById('trxForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      type: document.getElementById('tType').value,
+      amount: Number(document.getElementById('tAmount').value) || 0,
+      category: document.getElementById('tCategory').value.trim(),
+      description: document.getElementById('tDesc').value.trim(),
+      transaction_date: document.getElementById('tDate').value
+    };
+    if (data.amount <= 0) { toast('Jumlah tidak valid.', 'error'); return; }
+    const btn = document.getElementById('tSave');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    pauseIdle();
+    try {
+      const res = isEdit
+        ? await state.transactionsModule.updateTransaction(t.id, data)
+        : await state.transactionsModule.createTransaction(data);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+        await loadAllData();
+        switchView('finance');
+      } else toast(res.message, 'error');
+    } catch (err) {
+      console.error(err);
+      toast('Terjadi kesalahan.', 'error');
+    }
+    finally { btn.disabled = false; btn.textContent = 'Simpan'; resumeIdle(); }
+  });
+}
+
+function confirmDeleteTransaction(id) {
+  openModal('Hapus Transaksi', `
+    <p class="text-sm text-gray-300">Yakin ingin menghapus transaksi ini?</p>
+    <div class="flex gap-2 justify-end pt-5">
+      <button data-close-modal class="px-4 py-2 rounded-lg border border-gray-600 text-gray-300 hover:bg-gray-700 text-sm transition">Batal</button>
+      <button id="confirmDelT" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition">Hapus</button>
+    </div>`);
+  document.querySelectorAll('#modal [data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  document.getElementById('confirmDelT').addEventListener('click', async () => {
+    const btn = document.getElementById('confirmDelT');
+    btn.disabled = true; btn.textContent = 'Menghapus...';
+    pauseIdle();
+    try {
+      const res = await state.transactionsModule.deleteTransaction(id);
+      if (res.ok) {
+        toast(res.message, 'success');
+        closeModal();
+        await loadAllData();
+        switchView('finance');
+      } else toast(res.message, 'error');
+    } catch (e) {
+      console.error(e);
+      toast('Terjadi kesalahan.', 'error');
+    }
+    finally { btn.disabled = false; btn.textContent = 'Hapus'; resumeIdle(); }
+  });
+}
+
+/* ============================================================
+   NOTIFICATIONS
+   ============================================================ */
+async function renderNotifications() {
+  const res = await state.notificationsModule.getNotifications({});
+  if (res.ok) state.cache.notifications = res.data;
+
+  const list = state.cache.notifications;
+  const unread = list.filter(n => n.status === 'unread').length;
+  updateNotifBadge(unread);
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-gray-100">Notifikasi (${unread} belum dibaca) <span class="text-emerald-400 text-xs">● live</span></h3>
+        <button id="markAllBtn" class="px-3 py-1.5 rounded-lg bg-blue-900/40 text-blue-300 ring-1 ring-blue-700/40 text-xs font-semibold hover:bg-blue-900/60 transition">Tandai Semua</button>
+      </div>
+      <div id="notifList" class="space-y-2"></div>
+      <div id="notifEmpty" class="hidden text-center text-gray-400 py-12">
+        <i class="fa-solid fa-bell text-5xl text-gray-600 mb-3"></i>
+        <div class="font-semibold text-gray-300">Belum Ada Notifikasi</div>
+        <p class="text-xs mt-1">Notifikasi akan muncul saat ada aktivitas</p>
+      </div>
+    </section>`;
+  renderNotificationItems(list);
+
+  document.getElementById('markAllBtn').addEventListener('click', async () => {
+    pauseIdle();
+    try {
+      await state.notificationsModule.markAllNotificationsRead();
+      toast('Semua ditandai dibaca.', 'success');
+    } catch (e) { toast('Terjadi kesalahan.', 'error'); }
+    finally { resumeIdle(); }
+  });
+}
+
+function renderNotificationItems(list) {
+  const box = document.getElementById('notifList');
+  const empty = document.getElementById('notifEmpty');
+  if (!box) return;
+  if (!list.length) { box.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  const iconMap = {
+    winner: { icon: 'fa-trophy', cls: 'text-amber-400' },
+    payment_reminder: { icon: 'fa-clock', cls: 'text-blue-400' },
+    payment_approved: { icon: 'fa-circle-check', cls: 'text-emerald-400' },
+    payment_pending: { icon: 'fa-hourglass-half', cls: 'text-amber-400' },
+    due_date: { icon: 'fa-calendar-days', cls: 'text-purple-400' },
+    system: { icon: 'fa-bell', cls: 'text-gray-400' }
+  };
+  box.innerHTML = list.map(n => {
+    const ic = iconMap[n.type] || iconMap.system;
+    return `
+    <article class="border ${n.status === 'unread' ? 'border-blue-700/50 bg-blue-900/20' : 'border-gray-700 bg-gray-800'} rounded-xl p-3 flex items-start gap-3">
+      <div class="text-xl ${ic.cls}"><i class="fa-solid ${ic.icon}"></i></div>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <h4 class="font-semibold text-gray-100 text-sm truncate">${escapeHtml(n.title)}</h4>
+          ${n.status === 'unread' ? '<span class="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded-full">BARU</span>' : ''}
+        </div>
+        <p class="text-xs text-gray-400 mt-1">${escapeHtml(n.message)}</p>
+        <div class="text-[11px] text-gray-500 mt-1">${timestampToDateTime(n.created_at)}</div>
+      </div>
+      ${n.status === 'unread' ? `<button data-mark-read="${n.id}" class="text-xs text-blue-400 hover:text-blue-300 font-semibold whitespace-nowrap">Tandai</button>` : ''}
+    </article>`;
+  }).join('');
+  box.querySelectorAll('[data-mark-read]').forEach(b => b.addEventListener('click', async () => {
+    pauseIdle();
+    try {
+      await state.notificationsModule.markNotificationAsRead(b.dataset.markRead);
+    } catch (e) { toast('Terjadi kesalahan.', 'error'); }
+    finally { resumeIdle(); }
+  }));
+}
+
+/* ============================================================
+   LOGS (Firebase)
+   ============================================================ */
+async function renderLogs() {
+  try {
+    const res = await state.logsModule.getLogs(200);
+    if (res.ok) state.cache.logs = res.data;
+  } catch (e) {
+    console.error('Load logs error:', e);
+  }
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700">
+      <h3 class="font-bold text-gray-100 mb-4 flex items-center gap-2"><i class="fa-solid fa-clipboard-list text-blue-400"></i> Log Aktivitas <span class="text-emerald-400 text-xs">● live</span></h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-gray-400 border-b border-gray-700">
+            <th class="py-2 pr-2 whitespace-nowrap">Waktu</th>
+            <th class="py-2 pr-2">User</th><th class="py-2 pr-2">Aksi</th><th class="py-2 pr-2">Deskripsi</th>
+          </tr></thead><tbody id="logTbody"></tbody>
+        </table>
+      </div>
+      <div id="logEmpty" class="hidden text-center text-gray-400 py-12">
+        <i class="fa-solid fa-clipboard-list text-5xl text-gray-600 mb-3"></i>
+        <div class="font-semibold text-gray-300">Belum Ada Log</div>
+        <p class="text-xs mt-1">Aktivitas admin akan tercatat otomatis</p>
+      </div>
+    </section>`;
+
+  renderLogRows(state.cache.logs);
+}
+
+function renderLogRows(list) {
+  const tbody = document.getElementById('logTbody');
+  const empty = document.getElementById('logEmpty');
+  if (!tbody) return;
+  if (!list.length) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+  empty.classList.add('hidden');
+  tbody.innerHTML = list.map(l => `
+    <tr class="border-b border-gray-700">
+      <td class="py-2 pr-2 whitespace-nowrap text-gray-400">${timestampToDateTime(l.created_at)}</td>
+      <td class="py-2 pr-2 text-gray-300 font-medium">${escapeHtml(l.user || '-')}</td>
+      <td class="py-2 pr-2"><span class="text-xs font-mono bg-gray-700 px-1.5 py-0.5 rounded text-gray-300">${escapeHtml(l.action)}</span></td>
+      <td class="py-2 pr-2 text-gray-400">${escapeHtml(l.description || '')}</td>
+    </tr>`).join('');
+}
+
+/* ============================================================
+   REPORTS (Firebase)
+   ============================================================ */
+async function renderReports() {
+  const now = new Date();
+  const defaultMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="space-y-3">
+      <div class="bg-gray-800 rounded-2xl p-4 sm:p-5 shadow-sm border border-gray-700 no-print">
+        <h3 class="font-bold text-gray-100 text-lg mb-1 flex items-center gap-2"><i class="fa-solid fa-print text-blue-400"></i> Cetak Laporan</h3>
+        <p class="text-xs text-gray-400 mb-4">Generate laporan untuk dibagikan ke anggota</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <select id="repGroup" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+            <option value="all">Semua Kelompok</option>
+            ${state.cache.groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('')}
+          </select>
+          <input id="repMonth" type="month" value="${defaultMonth}" class="px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 text-sm focus:border-blue-500 outline-none">
+          <button id="loadRepBtn" class="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition"><i class="fa-solid fa-magnifying-glass"></i> Tampilkan</button>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button id="printRepBtn" class="hidden px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-200 text-sm font-semibold transition border border-gray-600"><i class="fa-solid fa-print"></i> Cetak / PDF</button>
+          <button id="shareWaBtn" class="hidden px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition"><i class="fa-brands fa-whatsapp"></i> Share WA</button>
+        </div>
+      </div>
+      <div id="reportResult"></div>
+    </section>`;
+
+  document.getElementById('loadRepBtn').addEventListener('click', loadReport);
+  loadReport();
+}
+
+async function loadReport() {
+  const groupId = document.getElementById('repGroup').value;
+  const month = document.getElementById('repMonth').value;
+  const box = document.getElementById('reportResult');
+  box.innerHTML = '<div class="bg-gray-800 rounded-2xl p-8 text-center text-gray-400 text-sm shadow-sm border border-gray-700">Memuat...</div>';
+  pauseIdle();
+  try {
+    // Compute report dari cache
+    const report = computeReportData(groupId, month);
+    renderReportView(report);
+  } catch (e) {
+    console.error(e);
+    box.innerHTML = '<div class="bg-red-900/40 text-red-200 rounded-2xl p-4 text-sm ring-1 ring-red-700/50">Terjadi kesalahan.</div>';
+  } finally { resumeIdle(); }
+}
+
+function computeReportData(groupId, month) {
+  const filterGroupId = (groupId && groupId !== 'all') ? groupId : null;
+  const filterMonth = month || null;
+
+  // Groups
+  let groups = state.cache.groups;
+  if (filterGroupId) groups = groups.filter(g => g.id === filterGroupId);
+
+  // Payments
+  let payments = state.cache.payments.map(p => ({
+    ...p,
+    paid_amount: Number(p.paid_amount || 0),
+    remaining: Number(p.amount || 0) - Number(p.paid_amount || 0)
+  }));
+  if (filterGroupId) payments = payments.filter(p => p.group_id === filterGroupId);
+  if (filterMonth) payments = payments.filter(p => String(p.due_date || '').startsWith(filterMonth));
+
+  // Transactions
+  let transactions = state.cache.transactions;
+  if (filterGroupId) transactions = transactions.filter(t => t.group_id === filterGroupId);
+  if (filterMonth) transactions = transactions.filter(t => String(t.transaction_date || '').startsWith(filterMonth));
+
+  // Winners
+  let winners = state.cache.winners;
+  if (filterGroupId) winners = winners.filter(w => w.group_id === filterGroupId);
+
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount || 0), 0);
+  const totalExpense = transactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount || 0), 0);
+
+  // Group summary
+  const groupSummary = {};
+  payments.forEach(p => {
+    if (!groupSummary[p.group_id]) {
+      groupSummary[p.group_id] = {
+        group_id: p.group_id,
+        group_name: p.group_name,
+        total: 0, paid: 0, partial: 0, unpaid: 0,
+        totalAmount: 0, totalPaid: 0
+      };
+    }
+    const gs = groupSummary[p.group_id];
+    gs.total++;
+    gs.totalAmount += Number(p.amount || 0);
+    gs.totalPaid += Number(p.paid_amount || 0);
+    if (p.status === 'paid') gs.paid++;
+    else if (p.status === 'partial') gs.partial++;
+    else gs.unpaid++;
+  });
+
+  return {
+    app_name: state.appName,
+    filter: {
+      group_id: filterGroupId || 'all',
+      group_name: filterGroupId ? (state.cache.groups.find(g => g.id === filterGroupId)?.name || '-') : 'Semua Kelompok',
+      month: filterMonth || 'Semua Periode'
+    },
+    summary: {
+      totalTagihan: payments.length,
+      totalLunas: payments.filter(p => p.status === 'paid').length,
+      totalPartial: payments.filter(p => p.status === 'partial').length,
+      totalBelum: payments.filter(p => p.status === 'unpaid' || p.status === 'pending').length,
+      totalNilai: payments.reduce((s, p) => s + Number(p.amount || 0), 0),
+      totalDibayar: payments.reduce((s, p) => s + Number(p.paid_amount || 0), 0),
+      totalIncome, totalExpense, saldo: totalIncome - totalExpense
+    },
+    groupSummary: Object.values(groupSummary),
+    payments: payments.slice().sort((a, b) => {
+      const g = String(a.group_name || '').localeCompare(String(b.group_name || ''));
+      if (g !== 0) return g;
+      return Number(a.period_number) - Number(b.period_number);
+    }),
+    transactions,
+    winners,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function renderReportView(d) {
+  const monthLabel = d.filter.month !== 'Semua Periode'
+    ? new Date(d.filter.month + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+    : 'Semua Periode';
+
+  const box = document.getElementById('reportResult');
+  box.innerHTML = `
+    <article id="reportPrintArea" class="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 text-gray-800">
+      <div class="text-center border-b-2 border-gray-800 pb-4 mb-5">
+        <div class="text-sm font-semibold text-blue-700 uppercase tracking-wide">${escapeHtml(d.app_name || 'ArisanKita')}</div>
+        <div class="text-2xl font-bold text-gray-800 mt-1">LAPORAN ARISAN</div>
+        <div class="text-lg font-semibold text-gray-700 mt-1">${escapeHtml(d.filter.group_name)}</div>
+        <div class="text-sm text-gray-500 mt-1">Periode: ${monthLabel}</div>
+        <div class="text-xs text-gray-400 mt-1">Dicetak: ${timestampToDateTime({ toDate: () => new Date(d.generatedAt) })}</div>
+      </div>
+
+      <div class="mb-5">
+        <h4 class="font-bold text-gray-800 mb-2 text-sm uppercase tracking-wide">Ringkasan Keuangan</h4>
+        <table class="w-full text-sm border border-gray-200">
+          <tbody>
+            <tr class="border-b border-gray-100">
+              <td class="px-3 py-2 text-gray-600">Total Pemasukan</td>
+              <td class="px-3 py-2 text-right font-semibold text-emerald-700">${formatIDR(d.summary.totalIncome)}</td>
+            </tr>
+            <tr class="border-b border-gray-100">
+              <td class="px-3 py-2 text-gray-600">Total Pengeluaran</td>
+              <td class="px-3 py-2 text-right font-semibold text-red-700">${formatIDR(d.summary.totalExpense)}</td>
+            </tr>
+            <tr class="bg-gray-50">
+              <td class="px-3 py-2 font-bold text-gray-800">Saldo</td>
+              <td class="px-3 py-2 text-right font-bold ${d.summary.saldo >= 0 ? 'text-emerald-700' : 'text-red-700'}">${formatIDR(d.summary.saldo)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mb-5">
+        <h4 class="font-bold text-gray-800 mb-2 text-sm uppercase tracking-wide">Status Pembayaran</h4>
+        <div class="grid grid-cols-4 gap-2 text-center">
+          <div class="border border-gray-200 rounded-lg p-2"><div class="text-[10px] text-gray-500 uppercase">Total</div><div class="text-lg font-bold text-gray-800">${d.summary.totalTagihan}</div></div>
+          <div class="border border-emerald-200 rounded-lg p-2 bg-emerald-50"><div class="text-[10px] text-emerald-600 uppercase">Lunas</div><div class="text-lg font-bold text-emerald-700">${d.summary.totalLunas}</div></div>
+          <div class="border border-blue-200 rounded-lg p-2 bg-blue-50"><div class="text-[10px] text-blue-600 uppercase">Sebagian</div><div class="text-lg font-bold text-blue-700">${d.summary.totalPartial}</div></div>
+          <div class="border border-red-200 rounded-lg p-2 bg-red-50"><div class="text-[10px] text-red-600 uppercase">Belum</div><div class="text-lg font-bold text-red-700">${d.summary.totalBelum}</div></div>
+        </div>
+      </div>
+
+      ${d.groupSummary.length > 1 ? `
+        <div class="mb-5">
+          <h4 class="font-bold text-gray-800 mb-2 text-sm uppercase tracking-wide">Ringkasan Per Kelompok</h4>
+          <table class="w-full text-sm border border-gray-200">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-xs text-gray-600">
+                <th class="px-2 py-1.5">Kelompok</th>
+                <th class="px-2 py-1.5 text-center">Total</th>
+                <th class="px-2 py-1.5 text-center">Lunas</th>
+                <th class="px-2 py-1.5 text-right">Nilai</th>
+                <th class="px-2 py-1.5 text-right">Dibayar</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${d.groupSummary.map(g => `
+                <tr class="border-t border-gray-100">
+                  <td class="px-2 py-1.5 font-medium">${escapeHtml(g.group_name)}</td>
+                  <td class="px-2 py-1.5 text-center">${g.total}</td>
+                  <td class="px-2 py-1.5 text-center text-emerald-700 font-semibold">${g.paid}</td>
+                  <td class="px-2 py-1.5 text-right">${formatIDR(g.totalAmount)}</td>
+                  <td class="px-2 py-1.5 text-right font-semibold">${formatIDR(g.totalPaid)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` : ''}
+
+      ${d.winners.length > 0 ? `
+        <div class="mb-5">
+          <h4 class="font-bold text-gray-800 mb-2 text-sm uppercase tracking-wide">Daftar Pemenang</h4>
+          <table class="w-full text-sm border border-gray-200">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-xs text-gray-600">
+                <th class="px-2 py-1.5">Putaran</th><th class="px-2 py-1.5">No</th>
+                <th class="px-2 py-1.5">Nama</th>
+                <th class="px-2 py-1.5 hidden sm:table-cell">Metode</th>
+                <th class="px-2 py-1.5 hidden sm:table-cell">Tanggal</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${d.winners.map(w => `
+                <tr class="border-t border-gray-100">
+                  <td class="px-2 py-1.5 font-semibold">${w.period_number}</td>
+                  <td class="px-2 py-1.5 font-bold">${String(w.member_number).padStart(2, '0')}</td>
+                  <td class="px-2 py-1.5">${escapeHtml(w.member_name)}</td>
+                  <td class="px-2 py-1.5 hidden sm:table-cell text-xs">${w.draw_method}</td>
+                  <td class="px-2 py-1.5 hidden sm:table-cell text-xs">${timestampToString(w.drawn_at)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` : ''}
+
+      ${d.transactions.length > 0 ? `
+        <div class="mb-5">
+          <h4 class="font-bold text-gray-800 mb-2 text-sm uppercase tracking-wide">Daftar Transaksi</h4>
+          <table class="w-full text-sm border border-gray-200">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-xs text-gray-600">
+                <th class="px-2 py-1.5">Tanggal</th><th class="px-2 py-1.5">Tipe</th>
+                <th class="px-2 py-1.5 hidden sm:table-cell">Kategori</th>
+                <th class="px-2 py-1.5">Deskripsi</th>
+                <th class="px-2 py-1.5 text-right">Jumlah</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${d.transactions.slice(0, 100).map(t => `
+                <tr class="border-t border-gray-100">
+                  <td class="px-2 py-1.5 text-xs">${formatDate(t.transaction_date)}</td>
+                  <td class="px-2 py-1.5 text-xs ${t.type === 'income' ? 'text-emerald-700' : 'text-red-700'} font-semibold">${t.type === 'income' ? 'Masuk' : 'Keluar'}</td>
+                  <td class="px-2 py-1.5 hidden sm:table-cell text-xs">${escapeHtml(t.category || '-')}</td>
+                  <td class="px-2 py-1.5 text-xs">${escapeHtml(t.description || '-')}</td>
+                  <td class="px-2 py-1.5 text-right text-xs font-semibold">${formatIDR(t.amount)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` : ''}
+
+      <div class="border-t-2 border-gray-800 pt-3 mt-5 text-xs text-gray-500 flex justify-between">
+        <div>Dicetak dari <strong>${escapeHtml(d.app_name || 'ArisanKita')}</strong></div>
+        <div>Halaman 1 dari 1</div>
+      </div>
+    </article>`;
+
+  document.getElementById('printRepBtn').classList.remove('hidden');
+  document.getElementById('shareWaBtn').classList.remove('hidden');
+  document.getElementById('printRepBtn').onclick = () => printReport();
+  document.getElementById('shareWaBtn').onclick = () => shareReportWa(d);
+}
+
+function printReport() {
+  const area = document.getElementById('reportPrintArea');
+  if (!area) return;
+  const appName = state.appName || 'ArisanKita';
+  const w = window.open('', '_blank');
+  w.document.write(`
+    <html><head><title>Laporan ${appName.replace(/[<>&"']/g, '')}</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>
+      @media print { @page { margin: 1cm; } body { font-size: 11px; } }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111; background: white; }
+    </style>
+    </head><body class="p-4">
+    ${area.outerHTML}
+    <script>window.onload = () => setTimeout(() => window.print(), 500);<\/script>
+    </body></html>`);
+  w.document.close();
+}
+
+function shareReportWa(d) {
+  const appName = d.app_name || state.appName || 'ArisanKita';
+  const lines = [];
+  lines.push('*LAPORAN ARISAN*');
+  lines.push('Kelompok: ' + d.filter.group_name);
+  lines.push('Periode: ' + d.filter.month);
+  lines.push('');
+  lines.push('*Keuangan:*');
+  lines.push('Pemasukan: ' + formatIDR(d.summary.totalIncome));
+  lines.push('Pengeluaran: ' + formatIDR(d.summary.totalExpense));
+  lines.push('Saldo: ' + formatIDR(d.summary.saldo));
+  lines.push('');
+  lines.push('*Pembayaran:*');
+  lines.push('Total: ' + d.summary.totalTagihan);
+  lines.push('Lunas: ' + d.summary.totalLunas);
+  lines.push('Sebagian: ' + d.summary.totalPartial);
+  lines.push('Belum: ' + d.summary.totalBelum);
+  lines.push('');
+  lines.push('_Dikirim dari ' + appName + '_');
+  const url = 'https://wa.me/?text=' + encodeURIComponent(lines.join('\n'));
+  window.open(url, '_blank');
+}
+
+/* ============================================================
+   SETTINGS (Firebase)
+   ============================================================ */
+async function renderSettings() {
+  try {
+    const res = await state.settingsModule.getSettings();
+    if (res.ok) state.cache.settings = res.data;
+  } catch (e) {
+    console.error('Load settings error:', e);
+  }
+  const s = state.cache.settings;
+
+  document.getElementById('mainContent').innerHTML = `
+    <section class="bg-gray-800 rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-700 max-w-2xl">
+      <h3 class="font-bold text-gray-100 mb-4 flex items-center gap-2"><i class="fa-solid fa-gear text-blue-400"></i> Pengaturan Aplikasi</h3>
+      <form id="settingsForm" class="space-y-3">
+        <div><label class="block text-sm font-medium text-gray-300 mb-1">Nama Aplikasi</label>
+        <input id="sAppName" type="text" value="${escapeHtml(s.app_name || 'ArisanKita')}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none text-sm"></div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-sm font-medium text-gray-300 mb-1">Mata Uang</label>
+          <input id="sCurrency" type="text" value="${escapeHtml(s.currency || 'IDR')}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm"></div>
+          <div><label class="block text-sm font-medium text-gray-300 mb-1">Zona Waktu</label>
+          <input id="sTimezone" type="text" value="${escapeHtml(s.timezone || 'Asia/Jakarta')}" class="w-full px-3 py-2 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 focus:border-blue-500 outline-none text-sm">
+          <p class="text-[11px] text-gray-500 mt-1">Contoh: Asia/Jakarta</p></div>
+        </div>
+        <div class="border-t border-gray-700 pt-3 mt-3 bg-blue-900/20 rounded-lg p-3">
+          <h4 class="font-semibold text-blue-300 text-sm mb-2 flex items-center gap-2"><i class="fa-solid fa-shield-halved"></i> Info Autentikasi</h4>
+          <p class="text-xs text-gray-400">Login admin menggunakan Firebase Authentication.</p>
+          <p class="text-xs text-gray-400 mt-1">Email: <strong class="text-gray-200">${escapeHtml(state.user?.email || '-')}</strong></p>
+          <p class="text-xs text-gray-500 mt-2">Untuk mengubah email/password, gunakan Firebase Console.</p>
+        </div>
+        <div class="flex justify-end pt-3">
+          <button type="submit" id="sSave" class="px-5 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold shadow-sm transition"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+        </div>
+      </form>
+    </section>`;
+
+  document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      app_name: document.getElementById('sAppName').value.trim(),
+      currency: document.getElementById('sCurrency').value.trim(),
+      timezone: document.getElementById('sTimezone').value.trim()
+    };
+    const btn = document.getElementById('sSave');
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyimpan...';
+    pauseIdle();
+    try {
+      const res = await state.settingsModule.updateSettings(data);
+      if (res.ok) {
+        toast(res.message, 'success');
+        Object.assign(state.cache.settings, data);
+        if (data.app_name) applyAppName(data.app_name);
+      } else toast(res.message, 'error');
+    } catch (err) {
+      console.error(err);
+      toast('Terjadi kesalahan.', 'error');
+    }
+    finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Simpan'; resumeIdle(); }
+  });
+}
+
+/* ============================================================
+   EVENT LISTENERS
+   ============================================================ */
+function setupEventListeners() {
+  $('menuToggle').addEventListener('click', () => {
+    $('sidebar').classList.remove('-translate-x-full');
+    $('sidebarOverlay').classList.remove('hidden');
+  });
+  $('sidebarOverlay').addEventListener('click', () => {
+    $('sidebar').classList.add('-translate-x-full');
+    $('sidebarOverlay').classList.add('hidden');
+  });
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchView(btn.dataset.view);
+      if (window.innerWidth < 1024) {
+        $('sidebar').classList.add('-translate-x-full');
+        $('sidebarOverlay').classList.add('hidden');
+      }
+    });
+  });
+  $('logoutBtn').addEventListener('click', async () => {
+    if (!confirm('Yakin ingin keluar?')) return;
+    await doLogout('Anda logout manual.');
+  });
+  document.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', closeModal));
+  $('year').textContent = new Date().getFullYear();
+}
+
+/* ============================================================
+   BOOTSTRAP
+   ============================================================ */
+(async function init() {
+  setupEventListeners();
+  setupIdleUI();
+  registerIdleListeners();
+
+  const modulesLoaded = await loadFirebaseModules();
+  if (!modulesLoaded) {
+    document.getElementById('mainContent').innerHTML = `
+      <div class="max-w-md mx-auto mt-10 bg-red-900/40 border border-red-700/50 rounded-2xl p-6 text-center">
+        <div class="text-5xl mb-3 text-red-400"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <h3 class="font-bold text-red-200 text-lg mb-2">Gagal Memuat Modul</h3>
+        <p class="text-sm text-red-300 mb-5">Periksa koneksi atau hubungi developer.</p>
+      </div>`;
+    return;
+  }
+
+  const ok = await ensureAuth();
+  if (!ok) return;
+
+  const loaded = await loadAllData();
+  if (loaded) {
+    switchView('dashboard');
+    resetIdleTimers();
+    setupRealtimeListeners();  // NEW
+  }
+})();
+
+/**
+ * Setup real-time listeners untuk payments, winners, notifications
+ */
+/* ============================================================
+   SETUP REALTIME LISTENERS
+   ============================================================ */
+function setupRealtimeListeners() {
+  try {
+    // 1. Cleanup listener lama
+    if (state.payListeners && state.payListeners.length) {
+      state.payListeners.forEach(fn => { try { fn(); } catch (e) {} });
+    }
+    state.payListeners = [];
+
+    // 2. Listener PAYMENTS
+    const unsubPay = state.paymentsModule.subscribePayments((list) => {
+      state.cache.payments = list;
+      state.cache.dashboard = computeDashboardStats();
+      if (state.currentView === 'payments') {
+        try { renderPaymentsList(); } catch (e) {}
+      }
+      if (state.currentView === 'dashboard') {
+        try { renderDashboard(); } catch (e) {}
+      }
+    });
+    state.payListeners.push(unsubPay);
+
+    // 3. Listener TRANSACTIONS
+    const unsubTrx = state.transactionsModule.subscribeTransactions((list) => {
+      state.cache.transactions = list;
+      state.cache.dashboard = computeDashboardStats();
+      if (state.currentView === 'finance') {
+        try { renderTransactionRows(list); } catch (e) {}
+      }
+      if (state.currentView === 'dashboard') {
+        try { renderDashboard(); } catch (e) {}
+      }
+    });
+    state.payListeners.push(unsubTrx);
+
+    // 4. Listener WINNERS
+    const unsubWin = state.winnersModule.subscribeWinners((list) => {
+      state.cache.winners = list;
+      state.cache.dashboard = computeDashboardStats();
+      if (state.currentView === 'winners') {
+        try { renderWinnerRows(filterWinnersList()); } catch (e) {}
+      }
+      if (state.currentView === 'dashboard') {
+        try { renderDashboard(); } catch (e) {}
+      }
+    });
+    state.payListeners.push(unsubWin);
+
+    // 5. Listener NOTIFICATIONS
+    const unsubNotif = state.notificationsModule.subscribeNotifications((list) => {
+      state.cache.notifications = list;
+      const unread = list.filter(n => n.status === 'unread').length;
+      updateNotifBadge(unread);
+      if (state.currentView === 'notifications') {
+        try { renderNotificationItems(list); } catch (e) {}
+      }
+    });
+    state.notifListener = unsubNotif;
+
+    // 6. Listener LOGS
+    const unsubLogs = state.logsModule.subscribeLogs((list) => {
+      state.cache.logs = list;
+      if (state.currentView === 'logs') {
+        try { renderLogRows(list); } catch (e) {}
+      }
+    });
+    state.payListeners.push(unsubLogs);
+
+    console.log('✅ Real-time listeners aktif (5 listeners)');
+  } catch (e) {
+    console.error('setupRealtimeListeners error:', e);
+  }
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('✅ SW registered:', reg.scope))
+      .catch(err => console.warn('⚠️ SW failed:', err));
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#111827" />
+<title id="pageTitle">Login Admin - ArisanKita</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" id="appleTitle" content="ArisanKita" />
+
+<!-- Font Awesome -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+
+<header class="bg-gray-800/80 backdrop-blur border-b border-gray-700">
+  <nav class="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-2">
+      <img src="icon-192.png" alt="Logo" class="w-10 h-10 rounded-xl shadow-lg object-cover ring-2 ring-gray-700" />
+      <span id="brandName" class="text-lg font-bold text-gray-100">ArisanKita</span>
+    </a>
+    <a href="index.html" class="text-sm font-semibold text-gray-400 hover:text-blue-400 transition">Kembali ke Beranda</a>
+  </nav>
+</header>
+
+<main class="flex-1 flex items-center justify-center px-4 sm:px-6 py-10">
+  <section class="w-full max-w-md">
+    <div class="bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 p-6 sm:p-8">
+      <div class="text-center mb-6">
+        <img src="icon-192.png" alt="Logo" class="mx-auto w-14 h-14 rounded-2xl shadow-lg object-cover mb-3 ring-2 ring-gray-700" />
+        <h1 class="text-2xl font-bold text-gray-100">Login Admin</h1>
+        <p id="loginSubtitle" class="text-sm text-gray-400 mt-1">Masuk untuk mengelola sistem arisan</p>
+      </div>
+
+      <div id="alertBox" class="hidden mb-4 px-4 py-3 rounded-lg text-sm"></div>
+
+      <form id="loginForm" novalidate class="space-y-4">
+        <div>
+          <label for="email" class="block text-sm font-medium text-gray-300 mb-1">Email Admin</label>
+          <input id="email" name="email" type="email" autocomplete="email" required
+            class="w-full px-4 py-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition text-sm"
+            placeholder="admin@arisan.local" />
+        </div>
+        <div>
+          <label for="password" class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+          <div class="relative">
+            <input id="password" name="password" type="password" autocomplete="current-password" required
+              class="w-full px-4 py-3 rounded-lg bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/30 outline-none transition text-sm pr-16"
+              placeholder="••••••••" />
+            <button type="button" id="togglePass" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 text-xs font-semibold">Lihat</button>
+          </div>
+        </div>
+
+        <button id="submitBtn" type="submit"
+          class="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold transition shadow-md disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          <span id="btnText">Masuk</span>
+          <span id="btnSpinner" class="hidden w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+        </button>
+      </form>
+
+      <div class="mt-4 text-center text-xs text-gray-500">
+        <i class="fa-solid fa-shield-halved text-emerald-400"></i> Dilindungi Firebase Authentication
+      </div>
+    </div>
+
+    <p class="text-center text-xs text-gray-500 mt-6">Belum punya akun? Buat di Firebase Console.</p>
+  </section>
+</main>
+
+<footer class="bg-gray-800 border-t border-gray-700">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-gray-500">
+    &copy; <span id="year"></span> <span id="footerName" class="text-gray-400">ArisanKita</span>
+  </div>
+</footer>
+
+<!-- Firebase Auth Script -->
+<script type="module">
+import { loginAdmin } from './firebase-auth.js';
+import { db, doc, getDoc, COLLECTIONS } from './firebase-config.js';
+
+document.getElementById('year').textContent = new Date().getFullYear();
+
+(async function loadAppInfo() {
+  try {
+    const settingsRef = doc(db, COLLECTIONS.SETTINGS, 'app');
+    const snap = await getDoc(settingsRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      const name = data.app_name || 'ArisanKita';
+      document.title = 'Login Admin - ' + name;
+      document.getElementById('brandName').textContent = name;
+      document.getElementById('footerName').textContent = name;
+      document.getElementById('appleTitle').setAttribute('content', name);
+      document.getElementById('loginSubtitle').textContent = 'Masuk untuk mengelola ' + name;
+    }
+  } catch (e) {
+    console.warn('Could not load app name:', e);
+  }
+})();
+
+(function checkLogoutReason() {
+  try {
+    const reason = localStorage.getItem('arisan_logout_reason');
+    if (reason) {
+      const alertBox = document.getElementById('alertBox');
+      alertBox.textContent = reason;
+      alertBox.className = 'mb-4 px-4 py-3 rounded-lg text-sm bg-amber-900/40 text-amber-200 border border-amber-700/50';
+      alertBox.classList.remove('hidden');
+      localStorage.removeItem('arisan_logout_reason');
+    }
+  } catch (e) {}
+})();
+
+const form = document.getElementById('loginForm');
+const btn = document.getElementById('submitBtn');
+const btnText = document.getElementById('btnText');
+const btnSpinner = document.getElementById('btnSpinner');
+const alertBox = document.getElementById('alertBox');
+
+function showAlert(message, type) {
+  alertBox.textContent = message;
+  alertBox.className = 'mb-4 px-4 py-3 rounded-lg text-sm ' + (
+    type === 'error' ? 'bg-red-900/40 text-red-200 border border-red-700/50' :
+    type === 'success' ? 'bg-emerald-900/40 text-emerald-200 border border-emerald-700/50' :
+    'bg-blue-900/40 text-blue-200 border border-blue-700/50'
+  );
+  alertBox.classList.remove('hidden');
+}
+
+function setLoading(on) {
+  btn.disabled = on;
+  btnText.textContent = on ? 'Memproses...' : 'Masuk';
+  btnSpinner.classList.toggle('hidden', !on);
+}
+
+document.getElementById('togglePass').addEventListener('click', function () {
+  const p = document.getElementById('password');
+  const isPass = p.type === 'password';
+  p.type = isPass ? 'text' : 'password';
+  this.textContent = isPass ? 'Sembunyikan' : 'Lihat';
+});
+
+form.addEventListener('submit', async function (e) {
+  e.preventDefault();
+  alertBox.classList.add('hidden');
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  if (!email) { showAlert('Email wajib diisi.', 'error'); return; }
+  if (!email.includes('@')) { showAlert('Format email tidak valid.', 'error'); return; }
+  if (!password) { showAlert('Password wajib diisi.', 'error'); return; }
+  if (password.length < 6) { showAlert('Password minimal 6 karakter.', 'error'); return; }
+
+  setLoading(true);
+  try {
+    const res = await loginAdmin(email, password);
+    if (res && res.ok) {
+      showAlert('Login berhasil! Mengalihkan...', 'success');
+      setTimeout(() => { window.location.href = 'dashboard.html'; }, 600);
+    } else {
+      showAlert((res && res.message) || 'Login gagal.', 'error');
+    }
+  } catch (err) {
+    showAlert('Terjadi kesalahan. Coba lagi.', 'error');
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+});
+</script>
+
+<!-- PWA Register SW -->
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => console.log('✅ SW registered:', reg.scope))
+      .catch(err => console.warn('⚠️ SW failed:', err));
+  });
+}
+</script>
+</body>
+</html>

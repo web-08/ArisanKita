@@ -1,0 +1,60 @@
+{
+  "name": "Munira Arisan - Sistem Pengelolaan Arisan Digital",
+  "short_name": "Munira Arisan",
+  "description": "Sistem pengelolaan arisan digital untuk admin Munira Arisan",
+  "start_url": "./dashboard.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "lang": "id",
+  "dir": "ltr",
+  "categories": ["business", "productivity", "finance"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "./dashboard.html",
+      "description": "Buka dashboard admin"
+    },
+    {
+      "name": "Pembayaran",
+      "short_name": "Bayar",
+      "url": "./dashboard.html",
+      "description": "Kelola pembayaran"
+    },
+    {
+      "name": "Reminder WhatsApp",
+      "short_name": "Reminder",
+      "url": "./dashboard.html",
+      "description": "Kirim reminder WhatsApp"
+    }
+  ]
+}
