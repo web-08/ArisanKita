@@ -10,8 +10,8 @@
  * ============================================================
  */
 
-const CACHE_NAME = 'Munira-Arisan-v18';
-const CACHE_VERSION = 18;
+const CACHE_NAME = 'Munira-Arisan-v19';
+const CACHE_VERSION = 19;
 const SHELL_ASSETS = [
   './',
   './index.html',
