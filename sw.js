@@ -10,8 +10,8 @@
  * ============================================================
  */
 
-const CACHE_NAME = 'arisan-kita-v20';
-const CACHE_VERSION = 20;
+const CACHE_NAME = 'arisan-kita-v23';
+const CACHE_VERSION = 23;
 const SHELL_ASSETS = [
   './',
   './index.html',
