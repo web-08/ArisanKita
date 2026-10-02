@@ -2271,13 +2271,22 @@ async function onDrawPeriodChange() {
   await loadCandidates();
 }
 async function loadCandidates() {
-  const infoBox = $('candidateInfo');
+  const infoBox = document.getElementById('candidateInfo');
   if (!state.drawState.groupId) { infoBox.classList.add('hidden'); return; }
+  
   try {
-    const res = await apiCall('getCandidates', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period });
-    if (!res.ok) { toast(res.message, 'error'); infoBox.classList.add('hidden'); return; }
+    // Firebase call
+    const res = await state.winnersModule.getCandidates(state.drawState.groupId, state.drawState.period);
+    
+    if (!res.ok) { 
+      toast(res.message || 'Gagal memuat kandidat.', 'error'); 
+      infoBox.classList.add('hidden'); 
+      return; 
+    }
+    
     const d = res.data;
-    state.drawState.candidates = d.candidates;
+    state.drawState.candidates = d.candidates || [];
+    
     infoBox.classList.remove('hidden');
     infoBox.innerHTML = `
       <div class="grid grid-cols-3 gap-2 text-center">
@@ -2286,8 +2295,13 @@ async function loadCandidates() {
         <div><div class="text-xs text-gray-400">Kandidat Sisa</div><div class="text-lg font-bold text-blue-400">${d.remaining}</div></div>
       </div>
       ${d.allowRepeat ? '<div class="text-xs text-emerald-300 mt-2 text-center">Kelompok mengizinkan pemenang berulang.</div>' : '<div class="text-xs text-gray-400 mt-2 text-center">Anggota yang sudah menang tidak muncul lagi.</div>'}`;
+    
     renderMethodPanel();
-  } catch (e) { toast('Gagal memuat kandidat.', 'error'); }
+  } catch (e) {
+    console.error('loadCandidates error:', e);
+    toast('Gagal memuat kandidat.', 'error');
+    infoBox.classList.add('hidden');
+  }
 }
 
 function setMethod(method) {
@@ -2364,7 +2378,7 @@ async function startRandomDraw() {
 async function finalizeRandomDraw() {
   const stage = $('drawStage');
   try {
-    const res = await apiCall('drawRandomWinner', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period, notes: '' });
+    const res = await state.winnersModule.drawRandomWinner(state.drawState.groupId, state.drawState.period, '');
     if (!res.ok) { stage.classList.add('hidden'); toast(res.message, 'error'); state.drawState.animating = false; resumeIdle(); return; }
     renderWinnerResult(res.data, 'random');
   } catch (e) { stage.classList.add('hidden'); toast('Terjadi kesalahan.', 'error'); }
@@ -2376,7 +2390,7 @@ async function drawByNumber() {
   if (!num) { toast('Nomor anggota tidak valid.', 'error'); return; }
   pauseIdle();
   try {
-    const res = await apiCall('drawWinnerByNumber', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period, memberNumber: num, notes: '' });
+    const res = await state.winnersModule.drawWinnerByNumber(state.drawState.groupId, state.drawState.period, num, '');
     if (!res.ok) { toast(res.message, 'error'); return; }
     $('drawStage').classList.remove('hidden');
     renderWinnerResult(res.data, 'number');
@@ -2389,7 +2403,7 @@ async function drawPredetermined() {
   if (!mid) { toast('Anggota belum dipilih.', 'error'); return; }
   pauseIdle();
   try {
-    const res = await apiCall('setPredeterminedWinner', { token: state.token, groupId: state.drawState.groupId, period: state.drawState.period, memberId: mid, notes: '' });
+    const res = await state.winnersModule.setPredeterminedWinner(state.drawState.groupId, state.drawState.period, mid, '');
     if (!res.ok) { toast(res.message, 'error'); return; }
     $('drawStage').classList.remove('hidden');
     renderWinnerResult(res.data, 'predetermined');
