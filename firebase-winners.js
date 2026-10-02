@@ -27,18 +27,25 @@ import {
 import { getGroupMembers } from './firebase-group-members.js';
 
 // ============================================================
-// GET CANDIDATES (anggota yang eligible untuk undian)
+// GET CANDIDATES (dengan logging + robustness)
 // ============================================================
 export async function getCandidates(groupId, periodNumber) {
   try {
+    console.log('🔍 getCandidates:', { groupId, periodNumber });
+
     if (!groupId) return { ok: false, message: 'Data kelompok belum dipilih.' };
 
     const groupSnap = await getDoc(doc(db, COLLECTIONS.GROUPS, groupId));
-    if (!groupSnap.exists()) return { ok: false, message: 'Kelompok tidak ditemukan.' };
+    if (!groupSnap.exists()) {
+      console.warn('❌ Group not found:', groupId);
+      return { ok: false, message: 'Kelompok tidak ditemukan.' };
+    }
     const group = groupSnap.data();
+    console.log('✅ Group found:', group.name);
 
     // Ambil anggota kelompok
     const members = await getGroupMembers(groupId);
+    console.log('👥 Members:', members.length, members.map(m => m.name));
 
     // Ambil winners yang sudah ada
     const winRef = collection(db, COLLECTIONS.WINNERS);
@@ -46,11 +53,14 @@ export async function getCandidates(groupId, periodNumber) {
     const winSnap = await getDocs(winQ);
     const winners = [];
     winSnap.forEach(d => winners.push({ id: d.id, ...d.data() }));
+    console.log('🏆 Winners:', winners.length);
 
     const wonIds = winners.map(w => w.member_id);
     const allowRepeat = String(group.allow_repeat_winner) === 'true';
+    console.log('🔄 Allow repeat:', allowRepeat);
 
     const candidates = members.filter(m => allowRepeat || wonIds.indexOf(m.member_id) === -1);
+    console.log('✅ Candidates:', candidates.length);
 
     return {
       ok: true,
@@ -68,7 +78,7 @@ export async function getCandidates(groupId, periodNumber) {
       }
     };
   } catch (e) {
-    console.error('getCandidates error:', e);
+    console.error('❌ getCandidates error:', e);
     return { ok: false, message: e.message };
   }
 }
@@ -81,11 +91,28 @@ export async function drawRandomWinner(groupId, periodNumber, notes) {
     if (!groupId) return { ok: false, message: 'Data kelompok belum dipilih.' };
     const period = Number(periodNumber) || 1;
 
-    // Cek apakah putaran ini sudah ada winner
+    console.log('🎲 drawRandomWinner called:');
+    console.log('   groupId:', groupId);
+    console.log('   period:', period);
+
+    // Cek existing
     const winRef = collection(db, COLLECTIONS.WINNERS);
-    const winQ = query(winRef, where('group_id', '==', groupId), where('period_number', '==', period));
+    const winQ = query(winRef, 
+      where('group_id', '==', groupId), 
+      where('period_number', '==', period)
+    );
     const winSnap = await getDocs(winQ);
-    if (!winSnap.empty) return { ok: false, message: 'Putaran ini sudah memiliki pemenang.' };
+    
+    console.log('   existing winners:', winSnap.size);
+    
+    if (!winSnap.empty) {
+      const existing = winSnap.docs[0].data();
+      console.log('   ⚠️ Existing winner:', existing.member_name, 'at', existing.drawn_at);
+      return { 
+        ok: false, 
+        message: `Putaran ${period} sudah ada pemenang: ${existing.member_name}. Hapus dulu kalau mau undi ulang.` 
+      };
+    }
 
     // Ambil candidates
     const cRes = await getCandidates(groupId, period);
@@ -96,6 +123,8 @@ export async function drawRandomWinner(groupId, periodNumber, notes) {
     // Random
     const idx = Math.floor(Math.random() * candidates.length);
     const winner = candidates[idx];
+
+    console.log('   🏆 Winner:', winner.name, '(#' + winner.number + ')');
 
     const winnerId = generateId('win');
     await setDoc(doc(db, COLLECTIONS.WINNERS, winnerId), {
@@ -109,6 +138,8 @@ export async function drawRandomWinner(groupId, periodNumber, notes) {
       drawn_at: Timestamp.now(),
       notes: notes || ''
     });
+
+    console.log('   ✅ Winner saved:', winnerId);
 
     return {
       ok: true,
@@ -125,11 +156,10 @@ export async function drawRandomWinner(groupId, periodNumber, notes) {
       }
     };
   } catch (e) {
-    console.error('drawRandomWinner error:', e);
+    console.error('❌ drawRandomWinner error:', e);
     return { ok: false, message: e.message };
   }
 }
-
 // ============================================================
 // DRAW WINNER BY NUMBER
 // ============================================================
