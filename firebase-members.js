@@ -33,33 +33,46 @@ import {
 } from './firebase-group-members.js';
 
 // ============================================================
-// GET ALL MEMBERS
+// GET ALL MEMBERS (OPTIMIZED)
 // ============================================================
 export async function getMembers(filter = {}) {
   try {
-    const membersRef = collection(db, COLLECTIONS.MEMBERS);
-    const snap = await getDocs(membersRef);
-    let list = [];
-    snap.forEach(d => {
-      list.push({ id: d.id, ...d.data() });
+    // 1. Ambil semua data sekaligus
+    const [membersSnap, gmSnap, groupsSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTIONS.MEMBERS)),
+      getDocs(collection(db, COLLECTIONS.GROUP_MEMBERS)),
+      getDocs(collection(db, COLLECTIONS.GROUPS))
+    ]);
+
+    const groupsMap = {};
+    groupsSnap.forEach(d => { groupsMap[d.id] = { id: d.id, ...d.data() }; });
+
+    // 2. Group gm by member_id
+    const gmByMember = {};
+    gmSnap.forEach(d => {
+      const gm = { gm_id: d.id, ...d.data() };
+      if (gm.status !== 'active') return;
+      if (!gmByMember[gm.member_id]) gmByMember[gm.member_id] = [];
+      gmByMember[gm.member_id].push(gm);
     });
 
-    // Sort by number
+    // 3. Enrich members
+    let list = [];
+    membersSnap.forEach(d => {
+      const m = { id: d.id, ...d.data() };
+      const gms = gmByMember[m.id] || [];
+      m.groups = gms.map(gm => ({
+        group_id: gm.group_id,
+        group_name: groupsMap[gm.group_id]?.name || '?'
+      }));
+      m.group_count = m.groups.length;
+      list.push(m);
+    });
+
+    // 4. Sort by number
     list.sort((a, b) => Number(a.number) - Number(b.number));
 
-    // Enrich dengan daftar kelompok
-    for (let i = 0; i < list.length; i++) {
-      try {
-        const groups = await getGroupMembersByMember(list[i].id);
-        list[i].groups = groups;
-        list[i].group_count = groups.length;
-      } catch (e) {
-        list[i].groups = [];
-        list[i].group_count = 0;
-      }
-    }
-
-    // Filter
+    // 5. Apply filter
     if (filter) {
       if (filter.status && filter.status !== 'all') {
         list = list.filter(m => m.status === filter.status);
@@ -83,7 +96,6 @@ export async function getMembers(filter = {}) {
     return { ok: false, message: e.message };
   }
 }
-
 // ============================================================
 // GET MEMBER BY ID
 // ============================================================
