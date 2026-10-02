@@ -24,29 +24,27 @@ import {
 } from './firebase-config.js';
 
 // ============================================================
-// 1. GET GROUP MEMBERS (untuk 1 kelompok)
+// GET GROUP MEMBERS (OPTIMIZED — bulk enrich)
 // ============================================================
 export async function getGroupMembers(groupId) {
   try {
-    const ref = collection(db, COLLECTIONS.GROUP_MEMBERS);
-    const q = query(ref, where('group_id', '==', groupId));
-    const snap = await getDocs(q);
+    // 1. Ambil group_members + semua members sekaligus
+    const [gmSnap, membersSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTIONS.GROUP_MEMBERS)),
+      getDocs(collection(db, COLLECTIONS.MEMBERS))
+    ]);
 
-    const gms = [];
-    snap.forEach(d => {
-      gms.push({ gm_id: d.id, ...d.data() });
-    });
+    const membersMap = {};
+    membersSnap.forEach(d => { membersMap[d.id] = { id: d.id, ...d.data() }; });
 
-    const activeGms = gms.filter(g => g.status === 'active');
+    const list = [];
+    gmSnap.forEach(d => {
+      const gm = { gm_id: d.id, ...d.data() };
+      if (gm.group_id !== groupId) return;
+      if (gm.status !== 'active') return;
 
-    const membersRef = collection(db, COLLECTIONS.MEMBERS);
-    const allMembersSnap = await getDocs(membersRef);
-    const memberMap = {};
-    allMembersSnap.forEach(d => { memberMap[d.id] = { id: d.id, ...d.data() }; });
-
-    const list = activeGms.map(gm => {
-      const m = memberMap[gm.member_id] || {};
-      return {
+      const m = membersMap[gm.member_id] || {};
+      list.push({
         gm_id: gm.gm_id,
         member_id: gm.member_id,
         number: m.number || '-',
@@ -54,7 +52,7 @@ export async function getGroupMembers(groupId) {
         phone: m.phone || '',
         status: m.status || 'unknown',
         joined_at: gm.joined_at
-      };
+      });
     });
 
     list.sort((a, b) => Number(a.number) - Number(b.number));
@@ -66,35 +64,32 @@ export async function getGroupMembers(groupId) {
 }
 
 // ============================================================
-// 2. GET MEMBER GROUPS (untuk 1 anggota)
+// GET MEMBER GROUPS (OPTIMIZED)
 // ============================================================
 export async function getGroupMembersByMember(memberId) {
   try {
-    const ref = collection(db, COLLECTIONS.GROUP_MEMBERS);
-    const q = query(ref, where('member_id', '==', memberId));
-    const snap = await getDocs(q);
+    const [gmSnap, groupsSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTIONS.GROUP_MEMBERS)),
+      getDocs(collection(db, COLLECTIONS.GROUPS))
+    ]);
 
-    const gms = [];
-    snap.forEach(d => {
-      gms.push({ gm_id: d.id, ...d.data() });
-    });
+    const groupsMap = {};
+    groupsSnap.forEach(d => { groupsMap[d.id] = { id: d.id, ...d.data() }; });
 
-    const activeGms = gms.filter(g => g.status === 'active');
+    const list = [];
+    gmSnap.forEach(d => {
+      const gm = { gm_id: d.id, ...d.data() };
+      if (gm.member_id !== memberId) return;
+      if (gm.status !== 'active') return;
 
-    const groupsRef = collection(db, COLLECTIONS.GROUPS);
-    const allGroupsSnap = await getDocs(groupsRef);
-    const groupMap = {};
-    allGroupsSnap.forEach(d => { groupMap[d.id] = { id: d.id, ...d.data() }; });
-
-    const list = activeGms.map(gm => {
-      const g = groupMap[gm.group_id] || {};
-      return {
+      const g = groupsMap[gm.group_id] || {};
+      list.push({
         gm_id: gm.gm_id,
         group_id: gm.group_id,
         group_name: g.name || '?',
         period_days: g.period_days || 0,
         amount: g.amount || 0
-      };
+      });
     });
 
     return list;
