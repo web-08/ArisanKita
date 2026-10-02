@@ -31,46 +31,69 @@ import {
 } from './firebase-group-members.js';
 
 // ============================================================
-// GET ALL GROUPS
+// GET ALL GROUPS (OPTIMIZED — batch query + client-side grouping)
 // ============================================================
 export async function getGroups() {
   try {
-    const ref = collection(db, COLLECTIONS.GROUPS);
-    const snap = await getDocs(ref);
-    const list = [];
-    snap.forEach(d => {
-      list.push({ id: d.id, ...d.data() });
+    // 1. Ambil semua data SEKALIGUS (parallel, 4 query)
+    const [groupsSnap, groupMembersSnap, paymentsSnap, membersSnap] = await Promise.all([
+      getDocs(collection(db, COLLECTIONS.GROUPS)),
+      getDocs(collection(db, COLLECTIONS.GROUP_MEMBERS)),
+      getDocs(collection(db, COLLECTIONS.PAYMENTS)),
+      getDocs(collection(db, COLLECTIONS.MEMBERS))
+    ]);
+
+    // 2. Convert snapshots ke array
+    const groups = [];
+    groupsSnap.forEach(d => groups.push({ id: d.id, ...d.data() }));
+
+    const groupMembers = [];
+    groupMembersSnap.forEach(d => groupMembers.push({ gm_id: d.id, ...d.data() }));
+
+    const payments = [];
+    paymentsSnap.forEach(d => payments.push({ id: d.id, ...d.data() }));
+
+    const members = [];
+    membersSnap.forEach(d => members.push({ id: d.id, ...d.data() }));
+
+    // 3. Buat map untuk lookup cepat (O(1))
+    const membersMap = {};
+    members.forEach(m => { membersMap[m.id] = m; });
+
+    // 4. Pre-compute stats per group (client-side, cepat)
+    const gmByGroup = {};
+    groupMembers.forEach(gm => {
+      if (gm.status !== 'active') return;
+      if (!gmByGroup[gm.group_id]) gmByGroup[gm.group_id] = [];
+      gmByGroup[gm.group_id].push(gm);
     });
 
-    // Enrich dengan statistik
-    for (let i = 0; i < list.length; i++) {
-      const g = list[i];
-      try {
-        const members = await getGroupMembers(g.id);
-        g.member_count = members.length;
+    const payByGroup = {};
+    payments.forEach(p => {
+      if (!payByGroup[p.group_id]) payByGroup[p.group_id] = [];
+      payByGroup[p.group_id].push(p);
+    });
 
-        // Hitung payment stats (kalau ada)
-        const payRef = collection(db, COLLECTIONS.PAYMENTS);
-        const payQ = query(payRef, where('group_id', '==', g.id));
-        const paySnap = await getDocs(payQ);
-        const payments = [];
-        paySnap.forEach(d => payments.push(d.data()));
-        g.payment_count = payments.length;
-        g.paid_count = payments.filter(p => p.status === 'paid').length;
-        g.unpaid_count = payments.length - g.paid_count;
+    // 5. Enrich setiap group
+    const result = groups.map(g => {
+      const gms = gmByGroup[g.id] || [];
+      const gPayments = payByGroup[g.id] || [];
+      const paidCount = gPayments.filter(p => p.status === 'paid').length;
 
-        // Putaran aktif
-        g.putaran_aktif = hitungPutaranAktif(g.start_date, Number(g.period_days) || 7);
-      } catch (e) {
-        g.member_count = 0;
-        g.payment_count = 0;
-        g.paid_count = 0;
-        g.unpaid_count = 0;
-        g.putaran_aktif = 1;
-      }
-    }
+      return {
+        ...g,
+        member_count: gms.length,
+        payment_count: gPayments.length,
+        paid_count: paidCount,
+        unpaid_count: gPayments.length - paidCount,
+        putaran_aktif: hitungPutaranAktif(g.start_date, Number(g.period_days) || 7)
+      };
+    });
 
-    return { ok: true, data: list };
+    // 6. Sort by name
+    result.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+
+    return { ok: true, data: result };
   } catch (e) {
     console.error('getGroups error:', e);
     return { ok: false, message: e.message };
