@@ -1,7 +1,7 @@
 {
-  "name": "Munira Arisan - Sistem Pengelolaan Arisan Digital",
-  "short_name": "Munira Arisan",
-  "description": "Sistem pengelolaan arisan digital untuk admin Munira Arisan",
+  "name": "ArisanKita - Sistem Pengelolaan Arisan Digital",
+  "short_name": "ArisanKita",
+  "description": "Sistem pengelolaan arisan digital untuk admin ArisanKita",
   "start_url": "./dashboard.html",
   "scope": "./",
   "display": "standalone",
